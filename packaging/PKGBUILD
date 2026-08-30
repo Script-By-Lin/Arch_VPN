@@ -1,0 +1,24 @@
+# Maintainer: ShadowTun Team <support@shadowtun.org>
+pkgname=shadowtun-vpn
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Cross-Distro Shadowsocks & tun2socks VPN Client for Linux"
+arch=('x86_64' 'aarch64')
+url="https://github.com/shadowtun/shadowtun-linux"
+license=('GPL3')
+depends=('python' 'python-pyqt5' 'shadowsocks-rust' 'tun2socks' 'iproute2' 'curl' 'jq')
+optdepends=('systemd-resolvconf: for systemd DNS routing')
+
+package() {
+    install -d "$pkgdir/opt/shadowtun"
+    cp -r "$srcdir/core" "$srcdir/gui" "$srcdir/cli" "$srcdir/bin" "$pkgdir/opt/shadowtun/"
+
+    install -d "$pkgdir/usr/local/bin"
+    ln -sf "/opt/shadowtun/bin/shadowtun" "$pkgdir/usr/local/bin/shadowtun"
+    ln -sf "/opt/shadowtun/bin/shadowtun" "$pkgdir/usr/local/bin/shadowtun-vpn"
+    ln -sf "/opt/shadowtun/bin/vpn-core-helper" "$pkgdir/usr/local/bin/vpn-core-helper"
+
+    install -Dm644 "$srcdir/packaging/shadowtun.desktop" "$pkgdir/usr/share/applications/shadowtun.desktop"
+    install -Dm644 "$srcdir/gui/assets/icon.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/shadowtun.svg"
+    install -Dm644 "$srcdir/gui/assets/icon.png" "$pkgdir/usr/share/icons/hicolor/256x256/apps/shadowtun.png"
+}

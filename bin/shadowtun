@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# ShadowTun Universal Linux Launcher
+# Works across Arch, Debian, Ubuntu, Fedora, RHEL, openSUSE.
+# ==============================================================================
+set -euo pipefail
+
+# Determine script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+export PYTHONPATH="$PROJECT_ROOT:${PYTHONPATH:-}"
+
+# Check python3
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "[ERROR] python3 is required but not installed." >&2
+  exit 1
+fi
+
+exec python3 "$PROJECT_ROOT/cli/main.py" "$@"

@@ -1,0 +1,169 @@
+#!/bin/bash
+# ==============================================================================
+# ShadowTun Linux VPN Privileged Helper
+# Executes network routing, TUN interface management, and DNS configuration.
+# Designed to be invoked via sudo or polkit.
+# ==============================================================================
+set -euo pipefail
+
+ACTION="${1:-}"
+shift || true
+
+usage() {
+  cat <<EOF
+Usage: vpn-core-helper <action> [args...]
+
+Actions:
+  tun-up <tun_name> <tun_ip>              Create and bring up TUN interface
+  tun-down <tun_name>                     Delete TUN interface
+  routes-up <server_ip> <gw> <dev> <tun>  Apply static server route and default TUN route
+  routes-down <server_ip> <gw> <dev> <tun>Restore physical default route
+  dns-up <tun_name> <dns1> [dns2]         Set DNS on TUN interface
+  dns-down <tun_name>                     Revert DNS on TUN interface
+  kill-all <tun_name>                     Stop any dangling tun2socks processes
+  check-deps                              Verify required kernel modules and binaries
+  status <tun_name>                       Check interface and routing status
+EOF
+  exit 1
+}
+
+check_root() {
+  if [[ $EUID -ne 0 ]]; then
+    echo "ERROR: vpn-core-helper must be run as root (or via sudo/pkexec)" >&2
+    exit 1
+  fi
+}
+
+case "$ACTION" in
+  tun-up)
+    check_root
+    TUN="${1:-tun0}"
+    IP="${2:-10.0.0.2/24}"
+    if ! ip link show "$TUN" >/dev/null 2>&1; then
+      ip tuntap add mode tun dev "$TUN"
+      ip addr add "$IP" dev "$TUN"
+      ip link set "$TUN" up
+      echo "TUN interface $TUN created ($IP)"
+    else
+      echo "TUN interface $TUN already exists"
+    fi
+    ;;
+
+  tun-down)
+    check_root
+    TUN="${1:-tun0}"
+    if ip link show "$TUN" >/dev/null 2>&1; then
+      ip link delete "$TUN" 2>/dev/null || true
+      echo "TUN interface $TUN deleted"
+    fi
+    ;;
+
+  routes-up)
+    check_root
+    SERVER_IP="${1:?Missing server IP}"
+    GW="${2:?Missing gateway IP}"
+    DEV="${3:?Missing physical device}"
+    TUN="${4:-tun0}"
+
+    echo "[+] Pinning server route: $SERVER_IP/32 via $GW dev $DEV"
+    ip route replace "$SERVER_IP/32" via "$GW" dev "$DEV"
+
+    echo "[+] Setting default route via $TUN"
+    ip route replace default dev "$TUN"
+
+    echo "[+] Dropping default IPv6 to prevent leaks"
+    ip -6 route del default 2>/dev/null || true
+    echo "Routes applied successfully."
+    ;;
+
+  routes-down)
+    check_root
+    SERVER_IP="${1:-}"
+    GW="${2:-}"
+    DEV="${3:-}"
+    TUN="${4:-tun0}"
+
+    if [[ -n "$GW" && -n "$DEV" ]]; then
+      echo "[+] Restoring default route via $GW dev $DEV"
+      ip route replace default via "$GW" dev "$DEV" 2>/dev/null || true
+    fi
+
+    if [[ -n "$SERVER_IP" ]]; then
+      echo "[+] Removing server route $SERVER_IP/32"
+      ip route del "$SERVER_IP/32" 2>/dev/null || true
+    fi
+
+    if ip link show "$TUN" >/dev/null 2>&1; then
+      ip route del default dev "$TUN" 2>/dev/null || true
+    fi
+    echo "Routes restored successfully."
+    ;;
+
+  dns-up)
+    check_root
+    TUN="${1:-tun0}"
+    DNS1="${2:-1.1.1.1}"
+    DNS2="${3:-8.8.8.8}"
+
+    if command -v resolvectl >/dev/null 2>&1; then
+      resolvectl dns "$TUN" "$DNS1" "$DNS2" 2>/dev/null || true
+      resolvectl domain "$TUN" "~." 2>/dev/null || true
+      resolvectl default-route "$TUN" yes 2>/dev/null || true
+      echo "Configured DNS with resolvectl on $TUN ($DNS1, $DNS2)"
+    elif command -v systemd-resolve >/dev/null 2>&1; then
+      systemd-resolve -i "$TUN" --set-dns="$DNS1" --set-domain="~." 2>/dev/null || true
+      echo "Configured DNS with systemd-resolve on $TUN"
+    else
+      echo "resolvectl not found, skipping systemd-resolved configuration"
+    fi
+    ;;
+
+  dns-down)
+    check_root
+    TUN="${1:-tun0}"
+    if command -v resolvectl >/dev/null 2>&1; then
+      resolvectl revert "$TUN" 2>/dev/null || true
+    elif command -v systemd-resolve >/dev/null 2>&1; then
+      systemd-resolve --revert -i "$TUN" 2>/dev/null || true
+    fi
+    echo "DNS reverted for $TUN"
+    ;;
+
+  kill-all)
+    check_root
+    TUN="${1:-tun0}"
+    pkill -f "tun2socks --device $TUN" 2>/dev/null || true
+    pkill -f "tun2socks" 2>/dev/null || true
+    if ip link show "$TUN" >/dev/null 2>&1; then
+      ip link delete "$TUN" 2>/dev/null || true
+    fi
+    echo "Stopped tun2socks and cleaned $TUN"
+    ;;
+
+  check-deps)
+    echo "Checking dependencies..."
+    for bin in ip sslocal tun2socks curl jq; do
+      if command -v "$bin" >/dev/null 2>&1; then
+        echo "  [OK] $bin -> $(command -v "$bin")"
+      else
+        echo "  [MISSING] $bin"
+      fi
+    done
+    ;;
+
+  status)
+    TUN="${1:-tun0}"
+    echo "=== TUN Interface ==="
+    ip -br link show "$TUN" 2>/dev/null || echo "$TUN: Down / Missing"
+    echo ""
+    echo "=== Active Default Routes ==="
+    ip -4 route show default || true
+    echo ""
+    echo "=== Processes ==="
+    ps aux | grep -E "sslocal|tun2socks" | grep -v grep || echo "No active VPN processes"
+    ;;
+
+  *)
+    usage
+    ;;
+esac

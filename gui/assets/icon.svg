@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F111A"/>
+      <stop offset="100%" stop-color="#1A1F35"/>
+    </linearGradient>
+    <linearGradient id="neonGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00E5FF"/>
+      <stop offset="50%" stop-color="#7C4DFF"/>
+      <stop offset="100%" stop-color="#00E676"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Rounded App Background -->
+  <rect width="512" height="512" rx="110" fill="url(#bgGrad)"/>
+  <rect width="504" height="504" x="4" y="4" rx="106" fill="none" stroke="#282D42" stroke-width="4"/>
+
+  <!-- Outer Glowing Shield -->
+  <path d="M 256 70 L 410 130 C 410 270, 350 390, 256 442 C 162 390, 102 270, 102 130 Z"
+        fill="none" stroke="url(#neonGrad)" stroke-width="18" stroke-linejoin="round" filter="url(#glow)"/>
+
+  <!-- Inner Power / Lightning Symbol -->
+  <path d="M 270 150 L 190 270 L 250 270 L 230 370 L 330 240 L 270 240 Z"
+        fill="url(#neonGrad)"/>
+</svg>

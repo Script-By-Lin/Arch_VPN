@@ -82,14 +82,23 @@ if ! command -v tun2socks >/dev/null 2>&1; then
   echo -e "${YELLOW}[+] Fetching prebuilt tun2socks...${RESET}"
   TUN_URL="https://github.com/xjasonlyu/tun2socks/releases/download/v2.5.2/tun2socks-linux-${BIN_ARCH}.zip"
   TMP_TUN="$(mktemp -d)"
-  curl -sSL "$TUN_URL" -o "$TMP_TUN/tun2socks.zip"
+  ZIP_PATH="$(mktemp --suffix=.zip)"
+  curl -sSL "$TUN_URL" -o "$ZIP_PATH"
   if command -v unzip >/dev/null 2>&1; then
-    unzip -q "$TMP_TUN/tun2socks.zip" -d "$TMP_TUN"
+    unzip -q "$ZIP_PATH" -d "$TMP_TUN"
   else
-    python3 -c "import zipfile; zipfile.ZipFile('$TMP_TUN/tun2socks.zip').extractall('$TMP_TUN')"
+    python3 -c "import zipfile; zipfile.ZipFile('$ZIP_PATH').extractall('$TMP_TUN')"
   fi
-  cp "$TMP_TUN"/tun2socks* /usr/local/bin/tun2socks
-  chmod +x /usr/local/bin/tun2socks
+  rm -f "$ZIP_PATH"
+  BIN_FOUND="$(find "$TMP_TUN" -type f -name "tun2socks*" | head -n 1)"
+  if [[ -n "$BIN_FOUND" && -f "$BIN_FOUND" ]]; then
+    cp "$BIN_FOUND" /usr/local/bin/tun2socks
+    chmod +x /usr/local/bin/tun2socks
+  else
+    echo -e "${RED}[✗] Failed to extract tun2socks binary.${RESET}"
+    rm -rf "$TMP_TUN"
+    exit 1
+  fi
   rm -rf "$TMP_TUN"
   echo -e "${GREEN}[✓] tun2socks installed to /usr/local/bin/tun2socks${RESET}"
 else
@@ -116,20 +125,49 @@ ln -sf "$TARGET_DIR/bin/vpn-core-helper" "$HELPER_LINK"
 
 # 4. Configure One-Time Sudoers Permissions (No more passwords on connect)
 echo -e "${CYAN}[4/6] Configuring one-time sudoers permissions...${RESET}"
-SSLOCAL_PATH="$(command -v sslocal || echo /usr/local/bin/sslocal)"
-TUN2SOCKS_PATH="$(command -v tun2socks || echo /usr/local/bin/tun2socks)"
-IP_PATH="$(command -v ip || echo /usr/bin/ip)"
-RESOLVECTL_PATH="$(command -v resolvectl || echo /usr/bin/resolvectl)"
-PKILL_PATH="$(command -v pkill || echo /usr/bin/pkill)"
-KILL_PATH="$(command -v kill || echo /usr/bin/kill)"
+
+get_bin_path() {
+  local bin="$1"
+  local fallback="$2"
+  local p
+  p="$(type -P "$bin" 2>/dev/null || which "$bin" 2>/dev/null || true)"
+  if [[ -n "$p" && "$p" =~ ^/ ]]; then
+    echo "$p"
+  else
+    echo "$fallback"
+  fi
+}
+
+TUN2SOCKS_PATH="$(get_bin_path tun2socks /usr/local/bin/tun2socks)"
+IP_PATH="$(get_bin_path ip /usr/sbin/ip)"
+RESOLVECTL_PATH="$(get_bin_path resolvectl /usr/bin/resolvectl)"
+PKILL_PATH="$(get_bin_path pkill /usr/bin/pkill)"
+KILL_PATH="$(get_bin_path kill /usr/bin/kill)"
+
+ALLOWED_BINS=("$HELPER_LINK" "$TUN2SOCKS_PATH" "/usr/local/bin/tun2socks" "/usr/bin/tun2socks" "$IP_PATH" "/usr/sbin/ip" "/usr/bin/ip" "$RESOLVECTL_PATH" "/usr/bin/resolvectl" "$PKILL_PATH" "/usr/bin/pkill" "$KILL_PATH" "/usr/bin/kill" "/bin/kill")
+
+VALID_BINS=()
+for b in "${ALLOWED_BINS[@]}"; do
+  if [[ "$b" =~ ^/ ]] && { [[ -e "$b" ]] || [[ "$b" == "$HELPER_LINK" ]] || [[ "$b" == "$TUN2SOCKS_PATH" ]]; }; then
+    if [[ ! " ${VALID_BINS[*]} " =~ " ${b} " ]]; then
+      VALID_BINS+=("$b")
+    fi
+  fi
+done
+
+SUDO_CMDS="$(printf ", %s" "${VALID_BINS[@]}")"
+SUDO_CMDS="${SUDO_CMDS:2}"
 
 cat <<EOF > "$SUDOERS_FILE"
 # ShadowTun VPN Privileged Helper Rule
 # Allows non-root users to manage TUN device, routes, and VPN daemon seamlessly.
-ALL ALL=(ALL) NOPASSWD: $HELPER_LINK, $TUN2SOCKS_PATH, $IP_PATH, $RESOLVECTL_PATH, $PKILL_PATH, $KILL_PATH
+ALL ALL=(ALL) NOPASSWD: $SUDO_CMDS
 EOF
 
 chmod 0440 "$SUDOERS_FILE"
+if command -v visudo >/dev/null 2>&1; then
+  visudo -cf "$SUDOERS_FILE" >/dev/null 2>&1 || true
+fi
 echo -e "${GREEN}[✓] Sudoers rule installed at $SUDOERS_FILE${RESET}"
 
 # 5. Install Desktop Entry and Icons

@@ -94,18 +94,58 @@ class VPNService:
             except Exception as e:
                 print(f"[VPNService] Listener error: {e}", file=sys.stderr)
 
+    def _teardown_internal(self):
+        """Internal teardown of network routes, DNS, processes, and session."""
+        server_ip = None
+        gw = None
+        dev = None
+        tun_dev = "tun0"
+
+        if os.path.exists(SESSION_FILE):
+            try:
+                with open(SESSION_FILE, "r") as f:
+                    session = json.load(f)
+                server_ip = session.get("server_ip")
+                gw = session.get("gateway_ip")
+                dev = session.get("physical_dev")
+                tun_dev = session.get("tun_dev", "tun0")
+            except Exception:
+                pass
+
+        # 1. Teardown network routing & DNS
+        self.network_mgr.teardown_network(
+            server_ip=server_ip,
+            gateway_ip=gw,
+            physical_dev=dev,
+            tun_name=tun_dev
+        )
+
+        # 2. Stop daemon processes
+        self.process_mgr.stop_all(tun_device=tun_dev)
+
+        # 3. Stop stats monitor
+        if hasattr(self, "stats_monitor") and self.stats_monitor:
+            try:
+                self.stats_monitor.stop()
+            except Exception:
+                pass
+
+        # 4. Clean session file
+        if os.path.exists(SESSION_FILE):
+            try:
+                os.remove(SESSION_FILE)
+            except Exception:
+                pass
+
     def connect(self, target: Any = None) -> bool:
         """
         Connect to VPN.
         Target can be a profile Dict, profile ID, profile Name, or ssconf:// / ss:// key string.
+        If already connected to another server, seamlessly switches to the new server.
         """
         with self._lock:
-            if self._state in (STATE_CONNECTING, STATE_CONNECTED):
+            if self._state == STATE_CONNECTING:
                 return True
-
-            self._state = STATE_CONNECTING
-            self._last_error = ""
-            self._notify("state_changed", {"message": "Initializing connection..."})
 
             try:
                 profile = None
@@ -137,6 +177,20 @@ class VPNService:
 
                 if not profile:
                     raise ConfigError(f"Could not load profile from: {target}")
+
+                # If already connected to the SAME profile, nothing to do
+                if self._state == STATE_CONNECTED and self._active_profile and self._active_profile.get("id") == profile.get("id"):
+                    return True
+
+                # If currently connected to a DIFFERENT profile, seamlessly switch
+                if self._state == STATE_CONNECTED:
+                    old_name = self._active_profile.get("name", "previous server") if self._active_profile else "previous server"
+                    self._notify("progress", {"message": f"Switching from {old_name} to {profile.get('name')}..."})
+                    self._teardown_internal()
+
+                self._state = STATE_CONNECTING
+                self._last_error = ""
+                self._notify("state_changed", {"message": f"Connecting to {profile.get('name')}..."})
 
                 self._active_profile = profile
                 settings = self.config_mgr.get_settings()
@@ -232,19 +286,7 @@ class VPNService:
     def _rollback_on_error(self):
         """Rollback all state and routing on failure."""
         try:
-            if os.path.exists(SESSION_FILE):
-                with open(SESSION_FILE, "r") as f:
-                    session = json.load(f)
-                self.network_mgr.teardown_network(
-                    server_ip=session.get("server_ip"),
-                    gateway_ip=session.get("gateway_ip"),
-                    physical_dev=session.get("physical_dev"),
-                    tun_name=session.get("tun_dev", "tun0")
-                )
-                self.process_mgr.stop_all(tun_device=session.get("tun_dev", "tun0"))
-                os.remove(SESSION_FILE)
-            else:
-                self.process_mgr.stop_all()
+            self._teardown_internal()
         except Exception:
             pass
 
@@ -258,43 +300,7 @@ class VPNService:
             self._notify("state_changed", {"message": "Disconnecting VPN..."})
 
             try:
-                server_ip = None
-                gw = None
-                dev = None
-                tun_dev = "tun0"
-
-                if os.path.exists(SESSION_FILE):
-                    try:
-                        with open(SESSION_FILE, "r") as f:
-                            session = json.load(f)
-                        server_ip = session.get("server_ip")
-                        gw = session.get("gateway_ip")
-                        dev = session.get("physical_dev")
-                        tun_dev = session.get("tun_dev", "tun0")
-                    except Exception:
-                        pass
-
-                # Teardown network & routing
-                self.network_mgr.teardown_network(
-                    server_ip=server_ip,
-                    gateway_ip=gw,
-                    physical_dev=dev,
-                    tun_name=tun_dev
-                )
-
-                # Stop daemons
-                self.process_mgr.stop_all(tun_device=tun_dev)
-
-                # Stop stats monitor
-                self.stats_monitor.stop()
-
-                # Clean session file
-                if os.path.exists(SESSION_FILE):
-                    try:
-                        os.remove(SESSION_FILE)
-                    except Exception:
-                        pass
-
+                self._teardown_internal()
                 self._state = STATE_DISCONNECTED
                 self._notify("disconnected", {"message": "VPN Disconnected"})
                 return True

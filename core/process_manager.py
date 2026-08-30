@@ -114,14 +114,14 @@ class ProcessManager:
 
     def start_tun2socks(self, tun_device: str = "tun0", proxy_url: str = "socks5://127.0.0.1:1080", restapi_addr: str = "127.0.0.1:17070") -> int:
         """Starts tun2socks process with sudo."""
-        tun2socks_bin = shutil.which("tun2socks")
-        if not tun2socks_bin:
+        tun2socks_bin = shutil.which("tun2socks") or "/usr/local/bin/tun2socks"
+        if not os.path.exists(tun2socks_bin) and not shutil.which("tun2socks"):
             raise ProcessError("tun2socks binary not found. Please install tun2socks.")
 
         self.stop_tun2socks()
 
         cmd = [
-            "tun2socks",
+            tun2socks_bin,
             "--device", tun_device,
             "--proxy", proxy_url,
             "--loglevel", "info"

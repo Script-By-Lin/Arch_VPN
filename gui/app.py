@@ -1,23 +1,24 @@
 #!/usr/bin/env python3
 """
-Modern Dark-Mode GUI for ShadowTun Linux VPN.
-Built with PyQt5, featuring animated glowing connect button,
-live speed graphs, profile manager, and settings.
+Minimalist Desktop Widget GUI for ShadowTun Linux VPN.
+Built with PyQt5, featuring a clean professional dark theme,
+compact layout, live telemetry, profile selector, and settings.
 """
 
 import os
 import sys
 import time
+import signal
 import threading
 from typing import Optional, Dict, Any
 
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QObject, QSize
-from PyQt5.QtGui import QColor, QFont, QPainter, QBrush, QPen, QLinearGradient, QRadialGradient, QIcon, QPixmap
+from PyQt5.QtGui import QColor, QFont, QPainter, QBrush, QPen, QIcon, QPixmap
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QLineEdit, QScrollArea, QFrame, QTabWidget,
     QPlainTextEdit, QComboBox, QCheckBox, QMessageBox, QSystemTrayIcon,
-    QMenu, QAction, QSpacerItem, QSizePolicy
+    QMenu, QAction, QSizePolicy
 )
 
 # Add project root to sys.path
@@ -36,7 +37,22 @@ from core import (
     STATE_DISCONNECTING,
     STATE_ERROR
 )
-from gui.theme import QSS_STYLE, DARK_PALETTE
+from gui.theme import QSS_STYLE, PALETTE
+
+
+def sigint_handler(signum, frame):
+    """Handles Ctrl+C (SIGINT) cleanly from terminal."""
+    print("\n[ShadowTun] Terminating upon Ctrl+C...")
+    app_inst = QApplication.instance()
+    if app_inst and hasattr(app_inst, "_main_win"):
+        win = app_inst._main_win
+        if win and hasattr(win, "service") and win.service.state == STATE_CONNECTED:
+            try:
+                win.service.disconnect()
+            except Exception:
+                pass
+    QApplication.quit()
+    sys.exit(0)
 
 
 class BridgeSignals(QObject):
@@ -46,144 +62,112 @@ class BridgeSignals(QObject):
     ping_result = pyqtSignal(str, int)
 
 
-class CircularConnectButton(QPushButton):
-    """Custom glowing circular connect button."""
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setFixedSize(140, 140)
-        self.setCursor(Qt.PointingHandCursor)
-        self.state = STATE_DISCONNECTED
-        self.pulse_angle = 0
-
-    def set_state(self, state: str):
-        self.state = state
-        self.update()
-
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-
-        rect = self.rect()
-        center = rect.center()
-        radius = rect.width() / 2 - 8
-
-        # Colors based on state
-        if self.state == STATE_CONNECTED:
-            ring_color = QColor(DARK_PALETTE["accent_green"])
-            bg_grad_start = QColor("#00E676")
-            bg_grad_end = QColor("#008940")
-            status_text = "CONNECTED"
-            action_text = "STOP"
-        elif self.state in (STATE_CONNECTING, STATE_DISCONNECTING):
-            ring_color = QColor(DARK_PALETTE["accent_yellow"])
-            bg_grad_start = QColor("#FFD600")
-            bg_grad_end = QColor("#FF9100")
-            status_text = "CONNECTING..." if self.state == STATE_CONNECTING else "STOPPING..."
-            action_text = "WAIT"
-        elif self.state == STATE_ERROR:
-            ring_color = QColor(DARK_PALETTE["accent_red"])
-            bg_grad_start = QColor("#FF5252")
-            bg_grad_end = QColor("#B71C1C")
-            status_text = "ERROR"
-            action_text = "RETRY"
-        else:
-            ring_color = QColor(DARK_PALETTE["primary"])
-            bg_grad_start = QColor("#00C9FF")
-            bg_grad_end = QColor("#0072FF")
-            status_text = "DISCONNECTED"
-            action_text = "CONNECT"
-
-        # Outer Glow Ring
-        pen = QPen(ring_color, 3)
-        painter.setPen(pen)
-        painter.setBrush(Qt.NoBrush)
-        painter.drawEllipse(center, radius + 2, radius + 2)
-
-        # Inner Gradient Circle
-        gradient = QLinearGradient(0, 0, 0, rect.height())
-        gradient.setColorAt(0, bg_grad_start)
-        gradient.setColorAt(1, bg_grad_end)
-        painter.setPen(Qt.NoPen)
-        painter.setBrush(QBrush(gradient))
-        painter.drawEllipse(center, radius - 4, radius - 4)
-
-        # Center Power Icon
-        painter.setPen(QPen(QColor("#FFFFFF"), 3, Qt.SolidLine, Qt.RoundCap))
-        painter.drawArc(int(center.x() - 16), int(center.y() - 20), 32, 32, 45 * 16, 270 * 16)
-        painter.drawLine(int(center.x()), int(center.y() - 20), int(center.x()), int(center.y() - 6))
-
-        # Main Action Text
-        painter.setPen(QColor("#0F111A"))
-        font = QFont("sans-serif", 11, QFont.Bold)
-        painter.setFont(font)
-        painter.drawText(rect.adjusted(0, 48, 0, 0), Qt.AlignHCenter | Qt.AlignTop, action_text)
-
-
-class ProfileCard(QFrame):
-    """Card widget representing a single VPN profile."""
-    def __init__(self, profile: dict, is_active: bool, on_connect, on_delete, on_ping, parent=None):
+class ProfileRowWidget(QFrame):
+    """Clean, high-density card representing a single server."""
+    def __init__(self, profile: dict, is_active: bool, is_connected: bool, on_connect, on_delete, on_ping, parent=None):
         super().__init__(parent)
         self.profile = profile
         self.is_active = is_active
+        self.is_connected = is_connected
         self.on_connect_callback = on_connect
         self.on_delete_callback = on_delete
         self.on_ping_callback = on_ping
-        self.setObjectName("ProfileCard")
-        self.setProperty("class", "card")
+        self.setObjectName("ServerCard")
         self.init_ui()
 
     def init_ui(self):
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(14, 10, 14, 10)
-        layout.setSpacing(12)
+        self.setStyleSheet("""
+            QFrame#ServerCard {
+                background-color: #181A22;
+                border: 1px solid #282B38;
+                border-radius: 8px;
+            }
+            QFrame#ServerCard:hover {
+                border: 1px solid #34384A;
+                background-color: #1D1F29;
+            }
+        """)
 
-        info_layout = QVBoxLayout()
-        info_layout.setSpacing(3)
+        main_vbox = QVBoxLayout(self)
+        main_vbox.setContentsMargins(10, 8, 10, 8)
+        main_vbox.setSpacing(4)
 
-        name_label = QLabel(self.profile.get("name", "Unnamed Server"))
-        name_label.setStyleSheet("font-weight: bold; font-size: 14px; color: #FFFFFF;")
-        info_layout.addWidget(name_label)
+        # Top Row: [Dot] [Server Name] ... [Ping Badge] [Connect/Switch/Active Button] [Delete Button]
+        top_row = QHBoxLayout()
+        top_row.setContentsMargins(0, 0, 0, 0)
+        top_row.setSpacing(6)
+
+        # Status Dot
+        self.dot = QLabel("●")
+        dot_color = "#10B981" if self.is_connected else ("#3B82F6" if self.is_active else "#6B7280")
+        self.dot.setStyleSheet(f"color: {dot_color}; font-size: 11px;")
+        top_row.addWidget(self.dot)
+
+        # Server Name
+        self.name_label = QLabel(self.profile.get("name", "Unnamed Server"))
+        self.name_label.setStyleSheet("font-weight: 600; font-size: 12px; color: #F9FAFB;")
+        top_row.addWidget(self.name_label, 1)
+
+        # Ping Badge
+        self.ping_label = QLabel("...")
+        self.ping_label.setStyleSheet("background-color: #14151D; color: #6B7280; border: 1px solid #282B38; border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: 600;")
+        top_row.addWidget(self.ping_label)
+
+        # Action / Select Button
+        self.btn_select = QPushButton()
+        self.btn_select.setCursor(Qt.PointingHandCursor)
+        self.update_action_button()
+        self.btn_select.clicked.connect(lambda: self.on_connect_callback(self.profile))
+        top_row.addWidget(self.btn_select)
+
+        # Delete Button
+        btn_delete = QPushButton("✕")
+        btn_delete.setFixedSize(20, 20)
+        btn_delete.setCursor(Qt.PointingHandCursor)
+        btn_delete.setStyleSheet("QPushButton { background-color: transparent; color: #6B7280; border: none; border-radius: 3px; font-size: 11px; font-weight: bold; } QPushButton:hover { background-color: rgba(239, 68, 68, 0.15); color: #EF4444; }")
+        btn_delete.clicked.connect(lambda: self.on_delete_callback(self.profile))
+        top_row.addWidget(btn_delete)
+
+        main_vbox.addLayout(top_row)
+
+        # Bottom Row: Host:Port • Method • Anti-DPI
+        bottom_row = QHBoxLayout()
+        bottom_row.setContentsMargins(0, 0, 0, 0)
+        bottom_row.setSpacing(4)
 
         server_str = f"{self.profile.get('server')}:{self.profile.get('server_port')}  •  {self.profile.get('method')}"
         if self.profile.get("prefix"):
             server_str += "  •  Anti-DPI"
         sub_label = QLabel(server_str)
-        sub_label.setStyleSheet("font-size: 11px; color: #8F9CAE;")
-        info_layout.addWidget(sub_label)
+        sub_label.setStyleSheet("font-size: 10px; color: #6B7280;")
+        bottom_row.addWidget(sub_label, 1)
 
-        layout.addLayout(info_layout, 1)
+        main_vbox.addLayout(bottom_row)
 
-        # Ping Badge
-        self.ping_label = QLabel("Ping...")
-        self.ping_label.setProperty("class", "badge")
-        self.ping_label.setStyleSheet("background-color: #222636; color: #00E5FF; border-radius: 6px; padding: 4px 8px; font-size: 11px;")
-        layout.addWidget(self.ping_label)
-
-        # Action Buttons
-        btn_connect = QPushButton("Select & Connect" if not self.is_active else "Active")
-        btn_connect.setCursor(Qt.PointingHandCursor)
-        if self.is_active:
-            btn_connect.setStyleSheet("background-color: rgba(0, 230, 118, 0.2); color: #00E676; border: 1px solid #00E676; border-radius: 6px; padding: 5px 12px; font-weight: bold;")
+    def update_action_button(self):
+        if self.is_connected:
+            self.btn_select.setText("Connected")
+            self.btn_select.setStyleSheet("background-color: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 4px; padding: 3px 8px; font-size: 10px; font-weight: 600;")
+        elif self.is_active:
+            self.btn_select.setText("Selected")
+            self.btn_select.setStyleSheet("background-color: rgba(59, 130, 246, 0.15); color: #3B82F6; border: 1px solid rgba(59, 130, 246, 0.35); border-radius: 4px; padding: 3px 8px; font-size: 10px; font-weight: 600;")
         else:
-            btn_connect.setStyleSheet("background-color: #222636; color: #FFFFFF; border: 1px solid #282D42; border-radius: 6px; padding: 5px 12px; font-weight: bold;")
-        btn_connect.clicked.connect(lambda: self.on_connect_callback(self.profile))
-        layout.addWidget(btn_connect)
-
-        btn_delete = QPushButton("✕")
-        btn_delete.setFixedSize(28, 28)
-        btn_delete.setCursor(Qt.PointingHandCursor)
-        btn_delete.setProperty("class", "action-delete")
-        btn_delete.clicked.connect(lambda: self.on_delete_callback(self.profile))
-        layout.addWidget(btn_delete)
+            self.btn_select.setText("Switch")
+            self.btn_select.setStyleSheet("background-color: #1E202B; color: #D1D5DB; border: 1px solid #282B38; border-radius: 4px; padding: 3px 8px; font-size: 10px; font-weight: 600;")
 
     def set_ping(self, ms: Optional[int]):
-        if ms is not None:
-            color = "#00E676" if ms < 150 else ("#FFD600" if ms < 350 else "#FF5252")
-            self.ping_label.setText(f"{ms} ms")
-            self.ping_label.setStyleSheet(f"background-color: rgba(0,0,0,0.3); color: {color}; border: 1px solid {color}; border-radius: 6px; padding: 4px 8px; font-size: 11px; font-weight: bold;")
+        if ms is not None and ms >= 0:
+            if ms < 150:
+                color = "#10B981"
+            elif ms < 350:
+                color = "#F59E0B"
+            else:
+                color = "#EF4444"
+            self.ping_label.setText(f"{ms}ms")
+            self.ping_label.setStyleSheet(f"background-color: #14151D; color: {color}; border: 1px solid #282B38; border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: 600;")
         else:
-            self.ping_label.setText("Timeout")
-            self.ping_label.setStyleSheet("background-color: rgba(255,82,82,0.2); color: #FF5252; border-radius: 6px; padding: 4px 8px; font-size: 11px;")
+            self.ping_label.setText("timeout")
+            self.ping_label.setStyleSheet("background-color: #14151D; color: #EF4444; border: 1px solid #282B38; border-radius: 4px; padding: 2px 6px; font-size: 10px;")
 
 
 class MainWindow(QMainWindow):
@@ -197,7 +181,8 @@ class MainWindow(QMainWindow):
         self.signals.ping_result.connect(self.on_ping_result)
 
         self.service.add_listener(self._service_listener)
-        self.card_widgets: Dict[str, ProfileCard] = {}
+        self.card_widgets: Dict[str, ProfileRowWidget] = {}
+        self.updating_combo = False
 
         self.init_ui()
         self.init_tray()
@@ -212,7 +197,7 @@ class MainWindow(QMainWindow):
 
     def init_ui(self):
         self.setWindowTitle("ShadowTun VPN")
-        self.resize(520, 720)
+        self.setFixedSize(400, 540)
         self.setStyleSheet(QSS_STYLE)
 
         central = QWidget()
@@ -220,168 +205,213 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
 
         main_layout = QVBoxLayout(central)
-        main_layout.setContentsMargins(20, 16, 20, 16)
-        main_layout.setSpacing(14)
+        main_layout.setContentsMargins(14, 14, 14, 14)
+        main_layout.setSpacing(10)
 
-        # Header Bar
+        # 1. Header Bar
         header = QHBoxLayout()
-        title_layout = QVBoxLayout()
-        title_layout.setSpacing(2)
+        header.setSpacing(8)
 
-        lbl_app_name = QLabel("SHADOWTUN VPN")
-        lbl_app_name.setStyleSheet("font-size: 18px; font-weight: 800; color: #00E5FF; letter-spacing: 1px;")
+        title_layout = QVBoxLayout()
+        title_layout.setSpacing(1)
+        lbl_app_name = QLabel("ShadowTun")
+        lbl_app_name.setProperty("class", "app-title")
         title_layout.addWidget(lbl_app_name)
 
-        lbl_app_sub = QLabel("Universal Shadowsocks & tun2socks Engine")
-        lbl_app_sub.setStyleSheet("font-size: 11px; color: #8F9CAE;")
+        lbl_app_sub = QLabel("Universal Linux VPN")
+        lbl_app_sub.setProperty("class", "app-subtitle")
         title_layout.addWidget(lbl_app_sub)
         header.addLayout(title_layout)
 
         header.addStretch(1)
 
         # Status Pill Badge
-        self.status_pill = QLabel("DISCONNECTED")
-        self.status_pill.setStyleSheet("background-color: #181B26; color: #8F9CAE; border: 1px solid #282D42; border-radius: 12px; padding: 5px 12px; font-size: 11px; font-weight: bold;")
+        self.status_pill = QLabel("● Disconnected")
+        self.status_pill.setProperty("class", "status-pill")
         header.addWidget(self.status_pill)
         main_layout.addLayout(header)
 
-        # Hero Connect Card
-        hero_card = QFrame()
-        hero_card.setProperty("class", "card")
-        hero_card.setStyleSheet("background-color: #141722; border: 1px solid #222738; border-radius: 14px;")
-        hero_layout = QVBoxLayout(hero_card)
-        hero_layout.setContentsMargins(16, 18, 16, 18)
-        hero_layout.setAlignment(Qt.AlignCenter)
-        hero_layout.setSpacing(12)
+        # 2. Main Connection Widget Card
+        main_card = QFrame()
+        main_card.setProperty("class", "surface")
+        card_layout = QVBoxLayout(main_card)
+        card_layout.setContentsMargins(12, 12, 12, 12)
+        card_layout.setSpacing(10)
 
-        # Big Connect Button
-        self.btn_connect = CircularConnectButton()
+        # Server Selector Dropdown
+        server_sel_layout = QVBoxLayout()
+        server_sel_layout.setSpacing(3)
+        lbl_server_title = QLabel("Active Server")
+        lbl_server_title.setStyleSheet("font-size: 11px; font-weight: 600; color: #9CA3AF;")
+        server_sel_layout.addWidget(lbl_server_title)
+
+        self.combo_servers = QComboBox()
+        self.combo_servers.setCursor(Qt.PointingHandCursor)
+        self.combo_servers.currentIndexChanged.connect(self.on_server_dropdown_changed)
+        server_sel_layout.addWidget(self.combo_servers)
+        card_layout.addLayout(server_sel_layout)
+
+        # Prominent Connect / Disconnect Action Button
+        self.btn_connect = QPushButton("Connect")
+        self.btn_connect.setCursor(Qt.PointingHandCursor)
+        self.btn_connect.setProperty("class", "btn-connect")
         self.btn_connect.clicked.connect(self.on_connect_toggle)
-        hero_layout.addWidget(self.btn_connect, 0, Qt.AlignCenter)
+        card_layout.addWidget(self.btn_connect)
 
-        # Current Server Label
-        self.lbl_current_server = QLabel("No Server Selected")
-        self.lbl_current_server.setStyleSheet("font-size: 14px; font-weight: bold; color: #FFFFFF;")
-        self.lbl_current_server.setAlignment(Qt.AlignCenter)
-        hero_layout.addWidget(self.lbl_current_server)
+        # Telemetry Stats Strip
+        self.stats_frame = QFrame()
+        self.stats_frame.setStyleSheet("background-color: #14151D; border: 1px solid #282B38; border-radius: 6px;")
+        stats_layout = QHBoxLayout(self.stats_frame)
+        stats_layout.setContentsMargins(10, 6, 10, 6)
+        stats_layout.setSpacing(8)
 
-        # Live Stats Row
-        stats_row = QHBoxLayout()
-        stats_row.setSpacing(16)
+        self.lbl_speed_down = QLabel("↓ 0 KB/s")
+        self.lbl_speed_down.setStyleSheet("color: #3B82F6; font-size: 11px; font-weight: 600;")
+        stats_layout.addWidget(self.lbl_speed_down)
 
-        # Speed Down
-        self.lbl_speed_down = QLabel("↓ 0.0 KB/s")
-        self.lbl_speed_down.setStyleSheet("color: #00E5FF; font-weight: bold; font-size: 12px;")
-        stats_row.addWidget(self.lbl_speed_down, 0, Qt.AlignCenter)
+        self.lbl_speed_up = QLabel("↑ 0 KB/s")
+        self.lbl_speed_up.setStyleSheet("color: #10B981; font-size: 11px; font-weight: 600;")
+        stats_layout.addWidget(self.lbl_speed_up)
 
-        # Speed Up
-        self.lbl_speed_up = QLabel("↑ 0.0 KB/s")
-        self.lbl_speed_up.setStyleSheet("color: #00E676; font-weight: bold; font-size: 12px;")
-        stats_row.addWidget(self.lbl_speed_up, 0, Qt.AlignCenter)
+        stats_layout.addStretch(1)
 
-        # Duration
-        self.lbl_duration = QLabel("⏱ 00:00")
-        self.lbl_duration.setStyleSheet("color: #8F9CAE; font-size: 12px;")
-        stats_row.addWidget(self.lbl_duration, 0, Qt.AlignCenter)
+        self.lbl_duration = QLabel("00:00")
+        self.lbl_duration.setStyleSheet("color: #9CA3AF; font-size: 11px;")
+        stats_layout.addWidget(self.lbl_duration)
 
-        # Total Data
-        self.lbl_total_data = QLabel("📊 0 MB")
-        self.lbl_total_data.setStyleSheet("color: #8F9CAE; font-size: 12px;")
-        stats_row.addWidget(self.lbl_total_data, 0, Qt.AlignCenter)
+        self.lbl_total_data = QLabel("0 MB")
+        self.lbl_total_data.setStyleSheet("color: #6B7280; font-size: 11px;")
+        stats_layout.addWidget(self.lbl_total_data)
 
-        hero_layout.addLayout(stats_row)
-        main_layout.addWidget(hero_card)
+        card_layout.addWidget(self.stats_frame)
+        main_layout.addWidget(main_card)
 
-        # Quick Key Import Bar
-        import_card = QFrame()
-        import_card.setProperty("class", "card")
-        import_layout = QHBoxLayout(import_card)
-        import_layout.setContentsMargins(10, 8, 10, 8)
-        import_layout.setSpacing(8)
-
-        self.input_key = QLineEdit()
-        self.input_key.setPlaceholderText("Paste ssconf:// URL, ss:// key, or JSON config...")
-        import_layout.addWidget(self.input_key, 1)
-
-        self.btn_import = QPushButton("Import & Connect")
-        self.btn_import.setProperty("class", "primary")
-        self.btn_import.setCursor(Qt.PointingHandCursor)
-        self.btn_import.clicked.connect(self.on_import_key)
-        import_layout.addWidget(self.btn_import)
-
-        main_layout.addWidget(import_card)
-
-        # Tabs
+        # 3. Compact Segmented Tabs
         self.tabs = QTabWidget()
-        self.tab_profiles = QWidget()
+        self.tab_servers = QWidget()
+        self.tab_servers.setStyleSheet("background-color: transparent;")
+        self.tab_import = QWidget()
+        self.tab_import.setStyleSheet("background-color: transparent;")
         self.tab_settings = QWidget()
+        self.tab_settings.setStyleSheet("background-color: transparent;")
         self.tab_logs = QWidget()
+        self.tab_logs.setStyleSheet("background-color: transparent;")
 
-        self.init_tab_profiles()
+        self.init_tab_servers()
+        self.init_tab_import()
         self.init_tab_settings()
         self.init_tab_logs()
 
-        self.tabs.addTab(self.tab_profiles, "Servers / Profiles")
+        self.tabs.addTab(self.tab_servers, "Servers")
+        self.tabs.addTab(self.tab_import, "Import")
         self.tabs.addTab(self.tab_settings, "Settings")
         self.tabs.addTab(self.tab_logs, "Logs")
         main_layout.addWidget(self.tabs, 1)
 
-    def init_tab_profiles(self):
-        layout = QVBoxLayout(self.tab_profiles)
-        layout.setContentsMargins(4, 8, 4, 4)
+    def init_tab_servers(self):
+        layout = QVBoxLayout(self.tab_servers)
+        layout.setContentsMargins(2, 6, 2, 2)
+        layout.setSpacing(6)
+
+        # Top Action Bar
+        top_bar = QHBoxLayout()
+        top_bar.setContentsMargins(4, 0, 4, 0)
+
+        self.lbl_server_count = QLabel("CONFIGURED SERVERS")
+        self.lbl_server_count.setStyleSheet("font-size: 10px; font-weight: 700; color: #6B7280; letter-spacing: 0.5px;")
+        top_bar.addWidget(self.lbl_server_count)
+
+        top_bar.addStretch(1)
+
+        btn_refresh_pings = QPushButton("↻ Test Latencies")
+        btn_refresh_pings.setCursor(Qt.PointingHandCursor)
+        btn_refresh_pings.setStyleSheet("background-color: #181A22; color: #9CA3AF; border: 1px solid #282B38; border-radius: 4px; padding: 2px 8px; font-size: 10px; font-weight: 600;")
+        btn_refresh_pings.clicked.connect(self.trigger_all_pings)
+        top_bar.addWidget(btn_refresh_pings)
+
+        layout.addLayout(top_bar)
 
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.scroll_area.setStyleSheet("QScrollArea { background-color: transparent; border: none; }")
+        self.scroll_area.viewport().setStyleSheet("background-color: transparent;")
+
         self.scroll_content = QWidget()
+        self.scroll_content.setStyleSheet("background-color: transparent;")
         self.profiles_layout = QVBoxLayout(self.scroll_content)
-        self.profiles_layout.setContentsMargins(0, 0, 0, 0)
-        self.profiles_layout.setSpacing(8)
+        self.profiles_layout.setContentsMargins(2, 2, 2, 2)
+        self.profiles_layout.setSpacing(6)
         self.profiles_layout.addStretch(1)
         self.scroll_area.setWidget(self.scroll_content)
 
         layout.addWidget(self.scroll_area)
 
+    def init_tab_import(self):
+        layout = QVBoxLayout(self.tab_import)
+        layout.setContentsMargins(6, 8, 6, 6)
+        layout.setSpacing(8)
+
+        lbl_info = QLabel("Paste ssconf:// URL, ss:// key, or JSON config:")
+        lbl_info.setStyleSheet("font-size: 11px; color: #9CA3AF;")
+        layout.addWidget(lbl_info)
+
+        self.input_key = QLineEdit()
+        self.input_key.setPlaceholderText("ssconf://... or ss://...")
+        layout.addWidget(self.input_key)
+
+        self.btn_import = QPushButton("Import & Add Server")
+        self.btn_import.setProperty("class", "btn-primary")
+        self.btn_import.setCursor(Qt.PointingHandCursor)
+        self.btn_import.clicked.connect(self.on_import_key)
+        layout.addWidget(self.btn_import)
+
+        layout.addStretch(1)
+
     def init_tab_settings(self):
         layout = QVBoxLayout(self.tab_settings)
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(14)
+        layout.setContentsMargins(6, 8, 6, 6)
+        layout.setSpacing(8)
 
         # DNS Setting
-        dns_box = QVBoxLayout()
-        dns_box.setSpacing(4)
-        dns_label = QLabel("DNS Resolver")
-        dns_label.setStyleSheet("font-weight: bold; font-size: 13px; color: #FFFFFF;")
-        dns_box.addWidget(dns_label)
+        lbl_dns = QLabel("DNS Resolver:")
+        lbl_dns.setStyleSheet("font-size: 11px; color: #9CA3AF;")
+        layout.addWidget(lbl_dns)
 
         self.combo_dns = QComboBox()
         self.combo_dns.addItems([
-            "Cloudflare (1.1.1.1, 1.0.0.1) - Recommended",
+            "Cloudflare (1.1.1.1, 1.0.0.1)",
             "Google DNS (8.8.8.8, 8.8.4.4)",
             "Quad9 (9.9.9.9, 149.112.112.112)",
             "AdGuard DNS (94.140.14.14, 94.140.15.15)"
         ])
-        dns_box.addWidget(self.combo_dns)
-        layout.addLayout(dns_box)
+        layout.addWidget(self.combo_dns)
 
-        # Port & TUN Row
-        row2 = QHBoxLayout()
-        row2.setSpacing(12)
+        # Port & TUN row
+        row = QHBoxLayout()
+        row.setSpacing(8)
 
-        port_box = QVBoxLayout()
-        port_box.addWidget(QLabel("Local SOCKS Port:"))
+        port_col = QVBoxLayout()
+        port_col.setSpacing(2)
+        port_lbl = QLabel("SOCKS Port:")
+        port_lbl.setStyleSheet("font-size: 10px; color: #6B7280;")
+        port_col.addWidget(port_lbl)
         self.input_port = QLineEdit("1080")
-        port_box.addWidget(self.input_port)
-        row2.addLayout(port_box)
+        port_col.addWidget(self.input_port)
+        row.addLayout(port_col)
 
-        tun_box = QVBoxLayout()
-        tun_box.addWidget(QLabel("TUN Device Name:"))
+        tun_col = QVBoxLayout()
+        tun_col.setSpacing(2)
+        tun_lbl = QLabel("TUN Device:")
+        tun_lbl.setStyleSheet("font-size: 10px; color: #6B7280;")
+        tun_col.addWidget(tun_lbl)
         self.input_tun = QLineEdit("tun0")
-        tun_box.addWidget(self.input_tun)
-        row2.addLayout(tun_box)
+        tun_col.addWidget(self.input_tun)
+        row.addLayout(tun_col)
 
-        layout.addLayout(row2)
+        layout.addLayout(row)
 
-        self.chk_killswitch = QCheckBox("Enable IPv6 Leak Protection (Killswitch)")
+        self.chk_killswitch = QCheckBox("IPv6 Leak Protection (Killswitch)")
         self.chk_killswitch.setChecked(True)
         layout.addWidget(self.chk_killswitch)
 
@@ -392,14 +422,14 @@ class MainWindow(QMainWindow):
         layout.addStretch(1)
 
         btn_save_settings = QPushButton("Save Settings")
-        btn_save_settings.setProperty("class", "primary")
+        btn_save_settings.setProperty("class", "btn-primary")
         btn_save_settings.clicked.connect(self.save_user_settings)
         layout.addWidget(btn_save_settings)
 
     def init_tab_logs(self):
         layout = QVBoxLayout(self.tab_logs)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(8)
+        layout.setContentsMargins(4, 6, 4, 4)
+        layout.setSpacing(6)
 
         self.txt_logs = QPlainTextEdit()
         self.txt_logs.setReadOnly(True)
@@ -407,7 +437,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.txt_logs, 1)
 
         btn_row = QHBoxLayout()
-        btn_refresh_logs = QPushButton("Refresh Logs")
+        btn_refresh_logs = QPushButton("Refresh")
         btn_refresh_logs.clicked.connect(self.refresh_logs)
         btn_row.addWidget(btn_refresh_logs)
 
@@ -423,15 +453,15 @@ class MainWindow(QMainWindow):
         pix.fill(Qt.transparent)
         p = QPainter(pix)
         p.setRenderHint(QPainter.Antialiasing)
-        p.setBrush(QBrush(QColor(DARK_PALETTE["primary"])))
+        p.setBrush(QBrush(QColor(PALETTE["primary"])))
         p.setPen(Qt.NoPen)
-        p.drawEllipse(2, 2, 28, 28)
+        p.drawRoundedRect(4, 4, 24, 24, 6, 6)
         p.end()
         self.tray.setIcon(QIcon(pix))
         self.tray.setToolTip("ShadowTun VPN")
 
         tray_menu = QMenu()
-        act_open = QAction("Open ShadowTun VPN", self)
+        act_open = QAction("Open ShadowTun", self)
         act_open.triggered.connect(self.show_and_raise)
         tray_menu.addAction(act_open)
 
@@ -469,13 +499,18 @@ class MainWindow(QMainWindow):
         self.logs_timer.timeout.connect(self.poll_logs)
         self.logs_timer.start(3000)
 
+        # Periodic timer (200ms) to allow Python interpreter to catch SIGINT / Ctrl+C
+        self.sig_timer = QTimer(self)
+        self.sig_timer.timeout.connect(lambda: None)
+        self.sig_timer.start(200)
+
     def poll_stats(self):
         if self.service.state == STATE_CONNECTED:
             stats = self.service.get_stats()
             self.signals.stats_updated.emit(stats)
 
     def poll_logs(self):
-        if self.tabs.currentIndex() == 2:
+        if self.tabs.currentIndex() == 3:
             self.refresh_logs()
 
     def refresh_logs(self):
@@ -492,12 +527,23 @@ class MainWindow(QMainWindow):
         profiles = self.service.config_mgr.get_profiles()
         settings = self.service.config_mgr.get_settings()
         active_id = settings.get("active_profile_id")
+        connected_prof = self.service.active_profile if self.service.state == STATE_CONNECTED else None
+        connected_id = connected_prof.get("id") if connected_prof else None
 
-        for p in profiles:
+        self.updating_combo = True
+        self.combo_servers.clear()
+
+        selected_idx = 0
+        for idx, p in enumerate(profiles):
             is_active = (p["id"] == active_id)
-            card = ProfileCard(
+            is_connected = (self.service.state == STATE_CONNECTED and p["id"] == connected_id)
+            if is_active or is_connected:
+                selected_idx = idx
+
+            card = ProfileRowWidget(
                 profile=p,
                 is_active=is_active,
+                is_connected=is_connected,
                 on_connect=self.on_profile_select_and_connect,
                 on_delete=self.on_profile_delete,
                 on_ping=self.on_ping_profile,
@@ -505,14 +551,45 @@ class MainWindow(QMainWindow):
             )
             self.card_widgets[p["id"]] = card
             self.profiles_layout.insertWidget(self.profiles_layout.count() - 1, card)
+            self.combo_servers.addItem(p.get("name", "Unnamed Server"), p["id"])
 
-        active_prof = self.service.config_mgr.get_profile_by_id(active_id) if active_id else None
-        if active_prof:
-            self.lbl_current_server.setText(f"{active_prof.get('name')}")
-        elif profiles:
-            self.lbl_current_server.setText(f"{profiles[0].get('name')}")
+        if profiles:
+            self.combo_servers.setCurrentIndex(selected_idx)
+            self.combo_servers.setEnabled(True)
+            self.lbl_server_count.setText(f"CONFIGURED SERVERS ({len(profiles)})")
         else:
-            self.lbl_current_server.setText("No Server Selected")
+            self.combo_servers.addItem("No Profiles (Add in Import tab)", "")
+            self.combo_servers.setEnabled(False)
+            self.lbl_server_count.setText("CONFIGURED SERVERS (0)")
+
+        self.updating_combo = False
+
+    def on_server_dropdown_changed(self, idx: int):
+        if self.updating_combo or idx < 0:
+            return
+        prof_id = self.combo_servers.itemData(idx)
+        if not prof_id:
+            return
+        profile = self.service.config_mgr.get_profile_by_id(prof_id)
+        if not profile:
+            return
+
+        settings = self.service.config_mgr.get_settings()
+        settings["active_profile_id"] = prof_id
+        self.service.config_mgr.save_settings(settings)
+
+        # Update card visuals
+        connected_prof = self.service.active_profile if self.service.state == STATE_CONNECTED else None
+        connected_id = connected_prof.get("id") if connected_prof else None
+        for pid, card in self.card_widgets.items():
+            card.is_active = (pid == prof_id)
+            card.is_connected = (self.service.state == STATE_CONNECTED and pid == connected_id)
+            card.dot.setStyleSheet(f"color: {'#10B981' if card.is_connected else ('#3B82F6' if card.is_active else '#6B7280')}; font-size: 11px;")
+            card.update_action_button()
+
+        # If currently connected to a DIFFERENT server, automatically hot-switch!
+        if self.service.state == STATE_CONNECTED and connected_id != prof_id:
+            self.start_connect_thread(profile)
 
     def trigger_all_pings(self):
         profiles = self.service.config_mgr.get_profiles()
@@ -540,8 +617,8 @@ class MainWindow(QMainWindow):
     def on_profile_delete(self, profile: dict):
         reply = QMessageBox.question(
             self,
-            "Delete Profile",
-            f"Are you sure you want to delete profile '{profile.get('name')}'?",
+            "Delete Server",
+            f"Remove profile '{profile.get('name')}'?",
             QMessageBox.Yes | QMessageBox.No
         )
         if reply == QMessageBox.Yes:
@@ -578,9 +655,13 @@ class MainWindow(QMainWindow):
 
     def start_connect_thread(self, target: Any = None):
         self.btn_connect.setEnabled(False)
-        self.btn_connect.set_state(STATE_CONNECTING)
-        self.status_pill.setText("CONNECTING...")
-        self.status_pill.setStyleSheet("background-color: rgba(255, 214, 0, 0.15); color: #FFD600; border: 1px solid #FFD600; border-radius: 12px; padding: 5px 12px; font-size: 11px; font-weight: bold;")
+        self.btn_connect.setText("Connecting...")
+        self.btn_connect.setProperty("class", "btn-connecting")
+        self.btn_connect.setStyle(self.btn_connect.style())
+
+        self.status_pill.setText("● Connecting...")
+        self.status_pill.setProperty("class", "status-pill-connecting")
+        self.status_pill.setStyle(self.status_pill.style())
 
         def _connect_worker():
             self.service.connect(target)
@@ -589,9 +670,13 @@ class MainWindow(QMainWindow):
 
     def start_disconnect_thread(self):
         self.btn_connect.setEnabled(False)
-        self.btn_connect.set_state(STATE_DISCONNECTING)
-        self.status_pill.setText("STOPPING...")
-        self.status_pill.setStyleSheet("background-color: rgba(255, 214, 0, 0.15); color: #FFD600; border: 1px solid #FFD600; border-radius: 12px; padding: 5px 12px; font-size: 11px; font-weight: bold;")
+        self.btn_connect.setText("Disconnecting...")
+        self.btn_connect.setProperty("class", "btn-connecting")
+        self.btn_connect.setStyle(self.btn_connect.style())
+
+        self.status_pill.setText("● Disconnecting...")
+        self.status_pill.setProperty("class", "status-pill-connecting")
+        self.status_pill.setStyle(self.status_pill.style())
 
         def _disconnect_worker():
             self.service.disconnect()
@@ -601,40 +686,62 @@ class MainWindow(QMainWindow):
     def on_state_changed(self, event_type: str, data: dict):
         self.btn_connect.setEnabled(True)
         state = self.service.state
-        self.btn_connect.set_state(state)
 
         if event_type == "import_success":
             self.btn_import.setEnabled(True)
-            self.btn_import.setText("Import & Connect")
+            self.btn_import.setText("Import & Add Server")
             self.input_key.clear()
             self.update_profiles_list()
             self.trigger_all_pings()
+            self.tabs.setCurrentIndex(0)
             prof = data.get("profile")
             if prof:
                 self.start_connect_thread(prof)
 
         elif event_type == "import_error":
             self.btn_import.setEnabled(True)
-            self.btn_import.setText("Import & Connect")
+            self.btn_import.setText("Import & Add Server")
             QMessageBox.critical(self, "Import Failed", f"Could not import key:\n\n{data.get('error')}")
 
         elif state == STATE_CONNECTED:
-            self.status_pill.setText("CONNECTED")
-            self.status_pill.setStyleSheet("background-color: rgba(0, 230, 118, 0.15); color: #00E676; border: 1px solid #00E676; border-radius: 12px; padding: 5px 12px; font-size: 11px; font-weight: bold;")
+            self.status_pill.setText("● Connected")
+            self.status_pill.setProperty("class", "status-pill-connected")
+            self.status_pill.setStyle(self.status_pill.style())
+
+            self.btn_connect.setText("Disconnect")
+            self.btn_connect.setProperty("class", "btn-disconnect")
+            self.btn_connect.setStyle(self.btn_connect.style())
+
+            self.combo_servers.setEnabled(True)
             self.act_tray_connect.setText("Disconnect")
-            self.tray.showMessage("ShadowTun VPN", "Connected to VPN", QSystemTrayIcon.Information, 2000)
+            self.tray.showMessage("ShadowTun VPN", "Connected to VPN", QSystemTrayIcon.Information, 1500)
 
         elif state == STATE_DISCONNECTED:
-            self.status_pill.setText("DISCONNECTED")
-            self.status_pill.setStyleSheet("background-color: #181B26; color: #8F9CAE; border: 1px solid #282D42; border-radius: 12px; padding: 5px 12px; font-size: 11px; font-weight: bold;")
+            self.status_pill.setText("● Disconnected")
+            self.status_pill.setProperty("class", "status-pill")
+            self.status_pill.setStyle(self.status_pill.style())
+
+            self.btn_connect.setText("Connect")
+            self.btn_connect.setProperty("class", "btn-connect")
+            self.btn_connect.setStyle(self.btn_connect.style())
+
+            self.combo_servers.setEnabled(True)
             self.act_tray_connect.setText("Connect")
-            self.lbl_speed_down.setText("↓ 0.0 KB/s")
-            self.lbl_speed_up.setText("↑ 0.0 KB/s")
-            self.lbl_duration.setText("⏱ 00:00")
+            self.lbl_speed_down.setText("↓ 0 KB/s")
+            self.lbl_speed_up.setText("↑ 0 KB/s")
+            self.lbl_duration.setText("00:00")
+            self.lbl_total_data.setText("0 MB")
 
         elif state == STATE_ERROR:
-            self.status_pill.setText("ERROR")
-            self.status_pill.setStyleSheet("background-color: rgba(255, 82, 82, 0.15); color: #FF5252; border: 1px solid #FF5252; border-radius: 12px; padding: 5px 12px; font-size: 11px; font-weight: bold;")
+            self.status_pill.setText("● Error")
+            self.status_pill.setProperty("class", "status-pill-error")
+            self.status_pill.setStyle(self.status_pill.style())
+
+            self.btn_connect.setText("Connect")
+            self.btn_connect.setProperty("class", "btn-connect")
+            self.btn_connect.setStyle(self.btn_connect.style())
+
+            self.combo_servers.setEnabled(True)
             if data.get("error"):
                 QMessageBox.critical(self, "VPN Connection Error", f"Failed to establish VPN connection:\n\n{data.get('error')}")
 
@@ -643,8 +750,8 @@ class MainWindow(QMainWindow):
     def on_stats_updated(self, stats: dict):
         self.lbl_speed_down.setText(f"↓ {stats['rx_speed_str']}")
         self.lbl_speed_up.setText(f"↑ {stats['tx_speed_str']}")
-        self.lbl_duration.setText(f"⏱ {stats['duration_str']}")
-        self.lbl_total_data.setText(f"📊 {stats['rx_total_str']}")
+        self.lbl_duration.setText(f"{stats['duration_str']}")
+        self.lbl_total_data.setText(f"{stats['rx_total_str']}")
 
     def on_log_updated(self, logs: list):
         self.txt_logs.setPlainText("\n".join(logs))
@@ -671,19 +778,30 @@ class MainWindow(QMainWindow):
 
     def refresh_ui_state(self):
         state = self.service.state
-        self.btn_connect.set_state(state)
         if state == STATE_CONNECTED:
-            self.status_pill.setText("CONNECTED")
-            self.status_pill.setStyleSheet("background-color: rgba(0, 230, 118, 0.15); color: #00E676; border: 1px solid #00E676; border-radius: 12px; padding: 5px 12px; font-size: 11px; font-weight: bold;")
+            self.status_pill.setText("● Connected")
+            self.status_pill.setProperty("class", "status-pill-connected")
+            self.btn_connect.setText("Disconnect")
+            self.btn_connect.setProperty("class", "btn-disconnect")
+        elif state in (STATE_CONNECTING, STATE_DISCONNECTING):
+            self.status_pill.setText("● Connecting...")
+            self.status_pill.setProperty("class", "status-pill-connecting")
+            self.btn_connect.setText("Connecting...")
+            self.btn_connect.setProperty("class", "btn-connecting")
         else:
-            self.status_pill.setText("DISCONNECTED")
+            self.status_pill.setText("● Disconnected")
+            self.status_pill.setProperty("class", "status-pill")
+            self.btn_connect.setText("Connect")
+            self.btn_connect.setProperty("class", "btn-connect")
+        self.status_pill.setStyle(self.status_pill.style())
+        self.btn_connect.setStyle(self.btn_connect.style())
 
     def quit_app(self):
         if self.service.state == STATE_CONNECTED:
             reply = QMessageBox.question(
                 self,
                 "Quit VPN",
-                "VPN is currently active. Do you want to disconnect before exiting?",
+                "VPN is currently active. Disconnect before exiting?",
                 QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel
             )
             if reply == QMessageBox.Yes:
@@ -697,9 +815,9 @@ class MainWindow(QMainWindow):
             self.hide()
             self.tray.showMessage(
                 "ShadowTun VPN",
-                "ShadowTun VPN is running in the background.",
+                "Running in system tray.",
                 QSystemTrayIcon.Information,
-                1500
+                1000
             )
             event.ignore()
         else:
@@ -707,10 +825,14 @@ class MainWindow(QMainWindow):
 
 
 def launch_gui():
+    signal.signal(signal.SIGINT, sigint_handler)
+    signal.signal(signal.SIGTERM, sigint_handler)
+
     app = QApplication(sys.argv)
     app.setApplicationName("ShadowTun VPN")
     app.setQuitOnLastWindowClosed(False)
     win = MainWindow()
+    app._main_win = win
     win.show()
     sys.exit(app.exec_())
 

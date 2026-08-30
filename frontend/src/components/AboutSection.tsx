@@ -8,16 +8,13 @@ import {
   Lock, 
   Zap, 
   Globe2, 
-  Terminal, 
   Layers, 
   Radio, 
   KeyRound, 
   Sliders, 
   Server,
   ArrowUpRight,
-  Activity,
-  CheckCircle2,
-  Sparkles
+  CheckCircle2
 } from "lucide-react";
 
 export default function AboutSection() {

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Terminal, Activity, ShieldCheck, Sparkles, Layers } from "lucide-react";
+import { Terminal, Activity, Sparkles, Layers, ShieldCheck } from "lucide-react";
 
 export default function LinuxTerminalShowcase() {
   const [activeTab, setActiveTab] = useState<"fastfetch" | "dmesg" | "iproute">("fastfetch");
@@ -26,18 +26,19 @@ export default function LinuxTerminalShowcase() {
         ? "sudo dmesg -w --facility=daemon,kern | grep -E 'tun|shadowtun|sslocal'"
         : "ip -brief address show && ip route show default";
 
-    setTypedCommand("");
     let idx = 0;
     const typing = setInterval(() => {
-      if (idx < targetCommand.length) {
-        setTypedCommand(targetCommand.slice(0, idx + 1));
-        idx++;
+      idx++;
+      if (idx <= targetCommand.length) {
+        setTypedCommand(targetCommand.slice(0, idx));
       } else {
         clearInterval(typing);
       }
     }, 22);
 
-    return () => clearInterval(typing);
+    return () => {
+      clearInterval(typing);
+    };
   }, [activeTab]);
 
   return (
@@ -72,15 +73,15 @@ export default function LinuxTerminalShowcase() {
           {/* Interactive Mode Switcher */}
           <div className="flex items-center gap-2 bg-[#0c101a] p-1.5 rounded-2xl border border-white/[0.08]">
             {[
-              { id: "fastfetch", label: "Fastfetch HUD", icon: Terminal },
-              { id: "dmesg", label: "Kernel dmesg", icon: Activity },
-              { id: "iproute", label: "ip route & tun0", icon: Layers },
+              { id: "fastfetch" as const, label: "Fastfetch HUD", icon: Terminal },
+              { id: "dmesg" as const, label: "Kernel dmesg", icon: Activity },
+              { id: "iproute" as const, label: "ip route & tun0", icon: Layers },
             ].map((tab) => {
               const isActive = activeTab === tab.id;
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
+                  onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-mono font-medium transition-all cursor-pointer ${
                     isActive
                       ? "bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 shadow-lg shadow-cyan-950/40"

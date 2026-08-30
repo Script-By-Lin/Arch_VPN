@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ARCH_NODES, ArchNode } from "@/data/appData";
-import { Cpu, ArrowRight, CheckCircle, Terminal, Layers, ShieldCheck, Activity, Network } from "lucide-react";
+import { ArrowRight, Terminal, Activity, Network } from "lucide-react";
 
 export default function ArchitectureVisualizer() {
   const [selectedNode, setSelectedNode] = useState<ArchNode>(ARCH_NODES[1]); // default to Kernel TUN
@@ -36,7 +36,7 @@ export default function ArchitectureVisualizer() {
               <span className="text-cyan-400 font-mono text-[11px]">Click node to inspect</span>
             </div>
 
-            {ARCH_NODES.map((node, index) => {
+            {ARCH_NODES.map((node) => {
               const isSelected = selectedNode.id === node.id;
               return (
                 <motion.div

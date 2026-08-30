@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { Copy, Check, FileCode, ExternalLink, ShieldCheck } from "lucide-react";
+import { Copy, Check, ShieldCheck } from "lucide-react";
 import { DISTRO_INSTALLS } from "@/data/appData";
 
 export default function DownlinkCard() {

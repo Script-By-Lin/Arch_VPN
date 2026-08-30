@@ -1,9 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import Image from "next/image";
 import { motion } from "framer-motion";
-import { Terminal, Shield, Zap, ArrowRight, CheckCircle2, Lock, Activity, Globe } from "lucide-react";
+import { Terminal, Shield, Zap, ArrowRight, Lock, Activity, Globe } from "lucide-react";
 
 export default function Hero() {
   const fullText = "Universal Shadowsocks & tun2socks VPN for Linux";
@@ -167,7 +166,7 @@ export default function Hero() {
               { name: "Fedora / RPM", icon: "🎩" },
               { name: "openSUSE", icon: "🦎" },
               { name: "systemd-resolved", icon: "🔒" },
-            ].map((distro, i) => (
+            ].map((distro) => (
               <motion.span
                 key={distro.name}
                 whileHover={{ y: -3, scale: 1.05 }}

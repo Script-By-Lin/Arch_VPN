@@ -21,7 +21,12 @@ PassThru VPN is a high-performance, full-system VPN client designed specifically
   - DNS selection (Cloudflare 1.1.1.1, Google 8.8.8.8, Quad9, AdGuard)
   - Real-time debug log console
   - System Tray integration (minimize-to-tray & quick connect)
-- **Rich Command-Line Interface (CLI)**: Full headless automation support with `connect`, `disconnect`, `status`, `import`, `list`, and `test` commands.
+- **Web Application & Interactive Documentation Portal (`frontend/`)**:
+  - Built with Next.js 16 (App Router), Framer Motion, and Tailwind CSS v4.
+  - Interactive VPN simulator, kernel pipeline visualizer, and live CLI playground.
+  - Ready for 1-click zero-config hosting on Vercel:
+    
+    [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/Script-By-Lin/Arch_VPN&root-directory=frontend)
 
 ---
 

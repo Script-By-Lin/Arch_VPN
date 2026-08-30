@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { 
   Power, 
   Activity, 
@@ -9,10 +9,7 @@ import {
   ArrowUp, 
   RefreshCw, 
   Terminal, 
-  ChevronDown, 
-  Sparkles,
-  ShieldCheck,
-  Zap
+  ChevronDown
 } from "lucide-react";
 
 export default function LiveDemoWidget() {
@@ -25,9 +22,9 @@ export default function LiveDemoWidget() {
   const [activeProfile, setActiveProfile] = useState("Tokyo-Fast-01");
   const [selectedDns, setSelectedDns] = useState("Cloudflare (1.1.1.1 / 1.0.0.1)");
   const [logs, setLogs] = useState<string[]>([
-    `[${new Date().toLocaleTimeString()}] [STATUS] ShadowTun GUI ready.`,
-    `[${new Date().toLocaleTimeString()}] [PROFILE] Active node: Tokyo-Fast-01 (198.51.100.42:8443).`,
-    `[${new Date().toLocaleTimeString()}] [IDLE] System using standard physical route (192.168.1.1).`
+    "[12:00:00] [STATUS] ShadowTun GUI ready.",
+    "[12:00:01] [PROFILE] Active node: Tokyo-Fast-01 (198.51.100.42:8443).",
+    "[12:00:02] [IDLE] System using standard physical route (192.168.1.1)."
   ]);
 
   const addLog = (tag: string, message: string) => {
@@ -330,7 +327,7 @@ export default function LiveDemoWidget() {
                 </span>
               </div>
 
-              <div className="space-y-1.5 overflow-y-auto max-h-[150px] text-[11px] leading-relaxed scrollbar-thin pr-1">
+              <div suppressHydrationWarning className="space-y-1.5 overflow-y-auto max-h-[150px] text-[11px] leading-relaxed scrollbar-thin pr-1">
                 {logs.map((log, index) => {
                   const isSuccess = log.includes("[SUCCESS]");
                   const isDisconnect = log.includes("[DISCONNECT]");

@@ -25,6 +25,35 @@ npm start
 
 ---
 
+## ⚡ Deploying to Vercel
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/Script-By-Lin/Arch_VPN&root-directory=frontend)
+
+### Option 1: Vercel Dashboard (Recommended)
+1. Go to [vercel.com/new](https://vercel.com/new) and import the **Arch_VPN** repository.
+2. In the **Configure Project** screen:
+   - Expand **Root Directory** and select `frontend` (or click Edit and choose `frontend`).
+   - Framework Preset will automatically detect **Next.js**.
+3. Click **Deploy**.
+
+### Option 2: Vercel CLI
+```bash
+# Install Vercel CLI globally if needed
+npm i -g vercel
+
+# Navigate to frontend and deploy
+cd frontend
+vercel
+
+# For production deployment
+vercel --prod
+```
+
+### Option 3: Monorepo Root Deploy
+A root `vercel.json` and `.vercelignore` are included. Running `vercel` or importing the root repository will automatically build `frontend` and serve the Next.js production output.
+
+---
+
 ## 🌟 Key Features
 
 1. **Downlink & Quick Install Card**:

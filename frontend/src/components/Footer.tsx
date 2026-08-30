@@ -2,7 +2,7 @@
 
 import React from "react";
 import Image from "next/image";
-import { Heart, Shield, Terminal, ArrowUp, Sparkles } from "lucide-react";
+import { ArrowUp } from "lucide-react";
 import GithubIcon from "@/components/GithubIcon";
 
 export default function Footer() {

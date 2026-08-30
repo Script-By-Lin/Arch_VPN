@@ -11,14 +11,11 @@ import {
   Copy, 
   Check, 
   Search, 
-  CheckCircle2, 
-  ShieldAlert, 
+  CheckCircle2,
   Zap,
-  Sliders,
-  ChevronRight,
-  ExternalLink
+  Sliders
 } from "lucide-react";
-import { CLI_COMMANDS, FAQ_ITEMS, CliCommand } from "@/data/appData";
+import { CLI_COMMANDS, FAQ_ITEMS } from "@/data/appData";
 
 export default function UserGuideSection() {
   const [activeTab, setActiveTab] = useState<"quickstart" | "gui" | "cli" | "protocol" | "faq">("quickstart");
@@ -61,17 +58,17 @@ export default function UserGuideSection() {
         {/* Tab Navigation Navigation Bar */}
         <div className="flex items-center justify-center gap-2 mb-10 overflow-x-auto pb-2 scrollbar-none">
           {[
-            { id: "quickstart", label: "Quick Start", icon: Zap },
-            { id: "gui", label: "Desktop GUI Guide", icon: Monitor },
-            { id: "cli", label: "CLI Commands Reference", icon: Terminal },
-            { id: "protocol", label: "ssconf:// Protocol", icon: KeyRound },
-            { id: "faq", label: "Troubleshooting & FAQ", icon: HelpCircle },
+            { id: "quickstart" as const, label: "Quick Start", icon: Zap },
+            { id: "gui" as const, label: "Desktop GUI Guide", icon: Monitor },
+            { id: "cli" as const, label: "CLI Commands Reference", icon: Terminal },
+            { id: "protocol" as const, label: "ssconf:// Protocol", icon: KeyRound },
+            { id: "faq" as const, label: "Troubleshooting & FAQ", icon: HelpCircle },
           ].map((tab) => {
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
                   isActive
                     ? "bg-gradient-to-r from-cyan-500/20 to-purple-500/20 text-cyan-200 border border-cyan-400/50 shadow-lg shadow-cyan-950/40"
@@ -135,7 +132,7 @@ export default function UserGuideSection() {
                       </p>
                     </div>
                     <div className="p-3 rounded-xl bg-black font-mono text-[11px] text-purple-300 overflow-x-auto border border-white/[0.04]">
-                      <code>shadowtun import "ssconf://..."</code>
+                      <code>shadowtun import &quot;ssconf://...&quot;</code>
                     </div>
                   </div>
 
@@ -448,7 +445,7 @@ export default function UserGuideSection() {
                 </div>
 
                 <div className="space-y-4">
-                  {FAQ_ITEMS.map((faq, index) => (
+                  {FAQ_ITEMS.map((faq) => (
                     <div
                       key={faq.question}
                       className="p-5 rounded-2xl bg-black/40 border border-white/[0.08] space-y-3"

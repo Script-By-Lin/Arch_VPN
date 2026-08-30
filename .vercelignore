@@ -1,0 +1,14 @@
+.git
+.github
+cli/
+gui/
+core/
+bin/
+packaging/
+*.sh
+sys.md
+.gemini/
+*.log
+.DS_Store
+node_modules
+.next

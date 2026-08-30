@@ -197,7 +197,9 @@ class MainWindow(QMainWindow):
 
     def init_ui(self):
         self.setWindowTitle("ShadowTun VPN")
-        self.setFixedSize(400, 540)
+        self.resize(420, 580)
+        self.setMinimumSize(380, 500)
+        self.setWindowFlags(Qt.Window | Qt.WindowMinMaxButtonsHint | Qt.WindowCloseButtonHint)
         self.setStyleSheet(QSS_STYLE)
 
         central = QWidget()
@@ -479,6 +481,8 @@ class MainWindow(QMainWindow):
         self.tray.show()
 
     def show_and_raise(self):
+        if self.isMinimized():
+            self.showNormal()
         self.show()
         self.raise_()
         self.activateWindow()

@@ -69,6 +69,29 @@ class ConfigManager:
         with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
             json.dump(settings, f, indent=2, ensure_ascii=False)
 
+    def get_setting(self, key: str, default: Any = None) -> Any:
+        return self.get_settings().get(key, default)
+
+    def set_setting(self, key: str, value: Any):
+        settings = self.get_settings()
+        settings[key] = value
+        self.save_settings(settings)
+
+    def get_active_profile_id(self) -> Optional[str]:
+        return self.get_settings().get("active_profile_id")
+
+    def set_active_profile(self, profile_id: Optional[str]):
+        self.set_setting("active_profile_id", profile_id)
+
+    def get_active_profile(self) -> Optional[Dict[str, Any]]:
+        active_id = self.get_active_profile_id()
+        if active_id:
+            p = self.get_profile_by_id(active_id)
+            if p:
+                return p
+        profiles = self.get_profiles()
+        return profiles[0] if profiles else None
+
     def get_profiles(self) -> List[Dict[str, Any]]:
         try:
             with open(PROFILES_FILE, "r", encoding="utf-8") as f:

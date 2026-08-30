@@ -5,6 +5,9 @@
 #           Fedora, RHEL, openSUSE, Alpine, etc.
 # Configures dependencies, static binary fallbacks, desktop launcher,
 # and one-time sudoers permissions.
+#
+# Direct 1-Line Curl Installation:
+#   curl -fsSL https://raw.githubusercontent.com/Script-By-Lin/Arch_VPN/main/install.sh | sudo bash
 # ==============================================================================
 set -euo pipefail
 
@@ -21,16 +24,48 @@ echo "║          ShadowTun VPN - Universal Linux Installer        ║"
 echo "╚═══════════════════════════════════════════════════════════╝"
 echo -e "${RESET}"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Require root/sudo permissions
+if [[ $EUID -ne 0 ]]; then
+  if [[ "$0" == "bash" || "$0" == "sh" || "$0" == "-bash" || ! -f "$0" ]]; then
+    echo -e "${RED}[!] Root permissions required for installation.${RESET}"
+    echo -e "    Please run with sudo:"
+    echo -e "    ${BOLD}curl -fsSL https://raw.githubusercontent.com/Script-By-Lin/Arch_VPN/main/install.sh | sudo bash${RESET}\n"
+    exit 1
+  else
+    echo -e "${YELLOW}[*] Root permissions required for installation. Requesting sudo...${RESET}"
+    exec sudo "$0" "$@"
+  fi
+fi
+
 TARGET_DIR="/opt/shadowtun"
 BIN_LINK="/usr/local/bin/shadowtun"
 HELPER_LINK="/usr/local/bin/vpn-core-helper"
 SUDOERS_FILE="/etc/sudoers.d/shadowtun"
+CLEANUP_TMP=false
+TMP_DIR=""
+SRC_DIR=""
 
-# Require sudo for installation steps
-if [[ $EUID -ne 0 ]]; then
-  echo -e "${YELLOW}[*] Root permissions required for installation. Requesting sudo...${RESET}"
-  exec sudo "$0" "$@"
+# Determine source files (Local clone vs Remote curl pipe)
+SCRIPT_SOURCE="${BASH_SOURCE[0]:-$0}"
+if [[ -f "$SCRIPT_SOURCE" ]]; then
+  LOCAL_DIR="$(cd "$(dirname "$SCRIPT_SOURCE")" 2>/dev/null && pwd)"
+  if [[ -d "$LOCAL_DIR/core" && -d "$LOCAL_DIR/gui" ]]; then
+    SRC_DIR="$LOCAL_DIR"
+  fi
+fi
+
+if [[ -z "$SRC_DIR" ]]; then
+  echo -e "${CYAN}[*] Downloading latest ShadowTun release from GitHub...${RESET}"
+  TMP_DIR="$(mktemp -d)"
+  CLEANUP_TMP=true
+  ARCHIVE_URL="https://github.com/Script-By-Lin/Arch_VPN/archive/refs/heads/main.tar.gz"
+  curl -sSL "$ARCHIVE_URL" | tar -xz -C "$TMP_DIR"
+  SRC_DIR="$(find "$TMP_DIR" -maxdepth 2 -type d -name "*Arch_VPN*" | head -n 1)"
+  if [[ -z "$SRC_DIR" || ! -d "$SRC_DIR/core" ]]; then
+    echo -e "${RED}[✗] Failed to download or unpack repository archive.${RESET}"
+    [[ -n "$TMP_DIR" && -d "$TMP_DIR" ]] && rm -rf "$TMP_DIR"
+    exit 1
+  fi
 fi
 
 # Detect Architecture
@@ -46,18 +81,55 @@ echo -e "${CYAN}[1/6] Detecting OS and installing dependencies...${RESET}"
 
 if command -v pacman >/dev/null 2>&1; then
   echo "Detected Arch Linux / Pacman"
-  pacman -Sy --noconfirm --needed python python-pyqt5 iproute2 systemd-resolvconf curl jq shadowsocks-rust tun2socks || true
+  pacman -Sy --noconfirm --needed python python-pyqt5 python-pip iproute2 systemd-resolvconf curl jq shadowsocks-rust || true
+  
+  # Try pacman for tun2socks
+  if ! command -v tun2socks >/dev/null 2>&1; then
+    pacman -S --noconfirm --needed tun2socks 2>/dev/null || true
+  fi
+
+  # Auto-install tun2socks from AUR using yay or paru if available
+  if ! command -v tun2socks >/dev/null 2>&1; then
+    TARGET_USER="${SUDO_USER:-$(logname 2>/dev/null || echo '')}"
+    if [[ -n "$TARGET_USER" && "$TARGET_USER" != "root" ]]; then
+      if sudo -u "$TARGET_USER" command -v yay >/dev/null 2>&1; then
+        echo -e "${CYAN}[*] Auto-installing tun2socks from AUR via yay...${RESET}"
+        sudo -u "$TARGET_USER" yay -S --noconfirm --needed tun2socks 2>/dev/null || true
+      elif sudo -u "$TARGET_USER" command -v paru >/dev/null 2>&1; then
+        echo -e "${CYAN}[*] Auto-installing tun2socks from AUR via paru...${RESET}"
+        sudo -u "$TARGET_USER" paru -S --noconfirm --needed tun2socks 2>/dev/null || true
+      fi
+    elif command -v yay >/dev/null 2>&1; then
+      yay -S --noconfirm --needed tun2socks 2>/dev/null || true
+    fi
+  fi
 elif command -v apt-get >/dev/null 2>&1; then
   echo "Detected Debian / Ubuntu"
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -y
-  apt-get install -y python3 python3-pyqt5 iproute2 systemd-resolved curl jq shadowsocks-libev || true
+  apt-get install -y python3 python3-pyqt5 python3-pip iproute2 systemd-resolved curl jq shadowsocks-libev || true
 elif command -v dnf >/dev/null 2>&1; then
   echo "Detected Fedora / RHEL"
-  dnf install -y python3 python3-qt5 iproute systemd-resolved curl jq || true
+  dnf install -y python3 python3-qt5 python3-pyqt5 python3-pip iproute systemd-resolved curl jq || true
 elif command -v zypper >/dev/null 2>&1; then
   echo "Detected openSUSE"
-  zypper install -y python3 python3-qt5 iproute2 systemd curl jq || true
+  zypper install -y python3 python3-qt5 python3-pip iproute2 systemd curl jq || true
+fi
+
+# Verify Python PyQt5 availability; attempt pip install fallback if system package was missed
+if ! python3 -c "from PyQt5 import QtCore, QtWidgets" >/dev/null 2>&1; then
+  echo -e "${YELLOW}[*] Installing PyQt5 via pip fallback...${RESET}"
+  if command -v pip3 >/dev/null 2>&1; then
+    pip3 install --break-system-packages PyQt5 || pip3 install PyQt5 || true
+  elif python3 -m pip --version >/dev/null 2>&1; then
+    python3 -m pip install --break-system-packages PyQt5 || python3 -m pip install PyQt5 || true
+  fi
+fi
+
+if python3 -c "from PyQt5 import QtCore, QtWidgets" >/dev/null 2>&1; then
+  echo -e "${GREEN}[✓] PyQt5 GUI runtime is available and verified.${RESET}"
+else
+  echo -e "${YELLOW}[!] Warning: PyQt5 is not installed. GUI mode will require 'python-pyqt5' / 'python3-pyqt5'. CLI mode works 100%.${RESET}"
 fi
 
 # 2. Check and Download Missing Core Binaries (sslocal & tun2socks)
@@ -97,6 +169,7 @@ if ! command -v tun2socks >/dev/null 2>&1; then
   else
     echo -e "${RED}[✗] Failed to extract tun2socks binary.${RESET}"
     rm -rf "$TMP_TUN"
+    [[ "$CLEANUP_TMP" == true && -d "$TMP_DIR" ]] && rm -rf "$TMP_DIR"
     exit 1
   fi
   rm -rf "$TMP_TUN"
@@ -108,10 +181,14 @@ fi
 # 3. Deploy Application Files to /opt/shadowtun
 echo -e "${CYAN}[3/6] Deploying application files to $TARGET_DIR...${RESET}"
 mkdir -p "$TARGET_DIR"
-cp -r "$SCRIPT_DIR/core" "$TARGET_DIR/"
-cp -r "$SCRIPT_DIR/gui" "$TARGET_DIR/"
-cp -r "$SCRIPT_DIR/cli" "$TARGET_DIR/"
-cp -r "$SCRIPT_DIR/bin" "$TARGET_DIR/"
+cp -r "$SRC_DIR/core" "$TARGET_DIR/"
+cp -r "$SRC_DIR/gui" "$TARGET_DIR/"
+cp -r "$SRC_DIR/cli" "$TARGET_DIR/"
+cp -r "$SRC_DIR/bin" "$TARGET_DIR/"
+if [[ -f "$SRC_DIR/uninstall.sh" ]]; then
+  cp "$SRC_DIR/uninstall.sh" "$TARGET_DIR/uninstall.sh"
+  chmod +x "$TARGET_DIR/uninstall.sh"
+fi
 
 chmod +x "$TARGET_DIR/bin/shadowtun"
 chmod +x "$TARGET_DIR/bin/vpn-core-helper"
@@ -176,12 +253,19 @@ mkdir -p /usr/share/applications
 mkdir -p /usr/share/icons/hicolor/scalable/apps
 mkdir -p /usr/share/icons/hicolor/256x256/apps
 
-cp "$TARGET_DIR/gui/assets/icon.svg" /usr/share/icons/hicolor/scalable/apps/shadowtun.svg 2>/dev/null || true
-cp "$TARGET_DIR/gui/assets/icon.png" /usr/share/icons/hicolor/256x256/apps/shadowtun.png 2>/dev/null || true
-cp "$SCRIPT_DIR/packaging/shadowtun.desktop" /usr/share/applications/shadowtun.desktop
+cp "$SRC_DIR/gui/assets/icon.svg" /usr/share/icons/hicolor/scalable/apps/shadowtun.svg 2>/dev/null || true
+cp "$SRC_DIR/gui/assets/icon.png" /usr/share/icons/hicolor/256x256/apps/shadowtun.png 2>/dev/null || true
+if [[ -f "$SRC_DIR/packaging/shadowtun.desktop" ]]; then
+  cp "$SRC_DIR/packaging/shadowtun.desktop" /usr/share/applications/shadowtun.desktop
+fi
 
 if command -v gtk-update-icon-cache >/dev/null 2>&1; then
   gtk-update-icon-cache -f /usr/share/icons/hicolor 2>/dev/null || true
+fi
+
+# Cleanup temp files if any
+if [[ "$CLEANUP_TMP" == true && -n "$TMP_DIR" && -d "$TMP_DIR" ]]; then
+  rm -rf "$TMP_DIR"
 fi
 
 # 6. Verification

@@ -1,18 +1,18 @@
-# ShadowTun Linux VPN
+# PassThru VPN (ShadowTun Linux)
 
 > **Universal Shadowsocks & tun2socks VPN Client for Linux (Arch, Debian, Ubuntu, Fedora, RPM, openSUSE)**
 
-ShadowTun is a high-performance, full-system VPN client designed specifically for Linux. It turns Shadowsocks proxy subscriptions into a complete TUN-based virtual private network, routing all TCP/UDP traffic and DNS queries securely while bypassing deep packet inspection (DPI).
+PassThru VPN is a high-performance, full-system VPN client designed specifically for Linux. It turns Shadowsocks proxy subscriptions into a complete TUN-based virtual private network, routing all TCP/UDP traffic and DNS queries securely while bypassing deep packet inspection (DPI).
 
 ---
 
 ## Key Features
 
-- **`ssconf://` Direct Key Parser**: Automatically fetches and decodes subscription keys (e.g., `ssconf://example.com/config.json#ServerName`), validates server error responses (such as package expiration notices), and injects local proxy ports.
+- **`ssconf://` Direct Key Parser**: Automatically fetches and decodes subscription keys (e.g., `ssconf://...../...json#ProfileName`), validates server error responses (such as package expiration notices), and injects local proxy ports.
 - **Cross-Distribution Support**: Runs natively on **Arch Linux / Manjaro / CachyOS**, **Debian / Ubuntu / Mint**, **Fedora / RHEL / CentOS**, and **openSUSE**.
 - **Full Tunnel Routing (`tun2socks`)**: Routes all system traffic through a `tun0` virtual network adapter with automatic default gateway preservation.
 - **Anti-Censorship & Prefix Support**: Full support for Shadowsocks-rust packet prefixes (TLS disguise), AEAD ciphers (`chacha20-ietf-poly1305`, `aes-256-gcm`), and UDP relay.
-- **One-Time Password Setup**: Automatically configures a privileged helper rule in `/etc/sudoers.d/shadowtun` so you never have to type your sudo password every time you connect.
+- **One-Time Password Setup**: Automatically configures a privileged helper rule in `/etc/sudoers.d/passthru-vpn` so you never have to type your sudo password every time you connect.
 - **Modern Dark-Mode GUI (PyQt5)**:
   - Glowing circular animated connect button
   - Live upload/download speed counters & session data meter
@@ -25,12 +25,19 @@ ShadowTun is a high-performance, full-system VPN client designed specifically fo
 
 ---
 
-## 🚀 Quick 1-Command Installation
+## 🚀 Quick 1-Command Installation (Direct `curl`)
 
-Run the universal installer (automatically installs dependencies, core binaries, desktop launcher, and sudoers rule):
+Install directly on any Linux distribution (Arch Linux, CachyOS, Manjaro, Debian, Ubuntu, Linux Mint, Fedora, openSUSE) with a single command:
 
 ```bash
-chmod +x install.sh
+curl -fsSL https://raw.githubusercontent.com/Script-By-Lin/Arch_VPN/main/install.sh | sudo bash
+```
+
+Or install from a local clone:
+
+```bash
+git clone https://github.com/Script-By-Lin/Arch_VPN.git
+cd Arch_VPN
 sudo ./install.sh
 ```
 
@@ -41,8 +48,8 @@ sudo ./install.sh
 ### 1. Launching Desktop GUI
 
 ```bash
-shadowtun-vpn gui
-# or launch "ShadowTun VPN" from your Application Menu / App Launcher
+passthru-vpn gui
+# or launch "PassThru VPN" from your Application Menu / App Launcher
 ```
 
 ### 2. Command-Line Interface (CLI)
@@ -50,45 +57,45 @@ shadowtun-vpn gui
 #### Import a Subscription Key
 
 ```bash
-shadowtun-vpn import "ssconf://example.com/config.json#ServerName"
+passthru-vpn import "ssconf://....#....#1"
 ```
 
 #### Connect to VPN
 
 ```bash
 # Connect using the imported key or active profile
-shadowtun-vpn connect
+passthru-vpn connect
 
 # Or connect directly with a key URL
-shadowtun-vpn connect "ssconf://example.com/config.json#ServerName"
+passthru-vpn connect "ssconf://...."
 
 # Connect and stream live traffic statistics
-shadowtun-vpn connect -m
+passthru-vpn connect -m
 ```
 
 #### Check Status
 
 ```bash
-shadowtun-vpn status
+passthru-vpn status
 ```
 
 #### List & Test Profiles
 
 ```bash
-shadowtun-vpn list
-shadowtun-vpn test
+passthru-vpn list
+passthru-vpn test
 ```
 
 #### Disconnect
 
 ```bash
-shadowtun-vpn disconnect
+passthru-vpn disconnect
 ```
 
 #### View Real-Time Logs
 
 ```bash
-shadowtun-vpn logs
+passthru-vpn logs
 ```
 
 ---
@@ -99,7 +106,7 @@ If you prefer a single standalone script without GUI dependencies:
 
 ```bash
 # Start VPN with key
-./tun2-stock.sh start "ssconf://example.com/config.json#ServerName"
+./tun2-stock.sh start "ssconf://....#...."
 
 # Stop VPN
 ./tun2-stock.sh stop
@@ -120,8 +127,12 @@ If you prefer a single standalone script without GUI dependencies:
 
 ## 🗑️ Uninstallation
 
-To cleanly remove all application files, links, and sudoers rules:
+To cleanly remove all application files, binaries, desktop shortcuts, and sudoers rules:
 
 ```bash
+# Via 1-line curl:
+curl -fsSL https://raw.githubusercontent.com/Script-By-Lin/Arch_VPN/main/uninstall.sh | sudo bash
+
+# Or from local clone:
 sudo ./uninstall.sh
 ```

@@ -63,6 +63,12 @@ export default function Navbar() {
             <a
               key={link.name}
               href={link.href}
+              onClick={() => {
+                const target = link.href.replace("#", "");
+                if (typeof window !== "undefined") {
+                  window.dispatchEvent(new CustomEvent("switch-userguide-tab", { detail: target }));
+                }
+              }}
               className="flex items-center gap-1.5 px-3 py-1 text-sm font-medium text-slate-300 hover:text-cyan-400 hover:bg-white/[0.04] rounded-full transition-all duration-200"
             >
               <link.icon className="w-3.5 h-3.5 opacity-70" />
@@ -114,7 +120,13 @@ export default function Navbar() {
             <a
               key={link.name}
               href={link.href}
-              onClick={() => setMobileMenuOpen(false)}
+              onClick={() => {
+                setMobileMenuOpen(false);
+                const target = link.href.replace("#", "");
+                if (typeof window !== "undefined") {
+                  window.dispatchEvent(new CustomEvent("switch-userguide-tab", { detail: target }));
+                }
+              }}
               className="flex items-center gap-2.5 px-3 py-2 text-sm font-medium text-slate-300 hover:text-cyan-400 hover:bg-white/[0.04] rounded-lg"
             >
               <link.icon className="w-4 h-4 text-cyan-400/80" />

@@ -91,27 +91,67 @@ export default function Footer() {
             </h4>
             <ul className="space-y-2 text-xs text-slate-400">
               <li>
-                <a href="#user-guide" className="hover:text-cyan-400 transition-colors">
+                <a
+                  href="#quickstart"
+                  onClick={() => {
+                    if (typeof window !== "undefined") {
+                      window.dispatchEvent(new CustomEvent("switch-userguide-tab", { detail: "quickstart" }));
+                    }
+                  }}
+                  className="hover:text-cyan-400 transition-colors"
+                >
                   Quick Start Guide
                 </a>
               </li>
               <li>
-                <a href="#user-guide" className="hover:text-cyan-400 transition-colors">
+                <a
+                  href="#gui"
+                  onClick={() => {
+                    if (typeof window !== "undefined") {
+                      window.dispatchEvent(new CustomEvent("switch-userguide-tab", { detail: "gui" }));
+                    }
+                  }}
+                  className="hover:text-cyan-400 transition-colors"
+                >
                   Desktop GUI Walkthrough
                 </a>
               </li>
               <li>
-                <a href="#user-guide" className="hover:text-cyan-400 transition-colors">
+                <a
+                  href="#cli"
+                  onClick={() => {
+                    if (typeof window !== "undefined") {
+                      window.dispatchEvent(new CustomEvent("switch-userguide-tab", { detail: "cli" }));
+                    }
+                  }}
+                  className="hover:text-cyan-400 transition-colors"
+                >
                   CLI Commands Reference
                 </a>
               </li>
               <li>
-                <a href="#user-guide" className="hover:text-cyan-400 transition-colors">
+                <a
+                  href="#protocol"
+                  onClick={() => {
+                    if (typeof window !== "undefined") {
+                      window.dispatchEvent(new CustomEvent("switch-userguide-tab", { detail: "protocol" }));
+                    }
+                  }}
+                  className="hover:text-cyan-400 transition-colors"
+                >
                   ssconf:// Subscription Protocol
                 </a>
               </li>
               <li>
-                <a href="#user-guide" className="hover:text-cyan-400 transition-colors">
+                <a
+                  href="#faq"
+                  onClick={() => {
+                    if (typeof window !== "undefined") {
+                      window.dispatchEvent(new CustomEvent("switch-userguide-tab", { detail: "faq" }));
+                    }
+                  }}
+                  className="hover:text-cyan-400 transition-colors"
+                >
                   Troubleshooting & FAQ
                 </a>
               </li>

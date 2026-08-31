@@ -12,7 +12,8 @@ import socket
 import signal
 import subprocess
 import shutil
-from typing import Optional, List
+import re
+from typing import Optional, List, Tuple, Generator
 
 STATE_DIR = os.path.expanduser("~/.config/shadowtun/state")
 LOG_DIR = os.path.expanduser("~/.config/shadowtun/logs")
@@ -190,20 +191,104 @@ class ProcessManager:
         tun2socks_pid = self._read_pid(self.tun2socks_pid_file)
         return bool(self.is_pid_alive(sslocal_pid) and self.is_pid_alive(tun2socks_pid))
 
+    def _parse_timestamp(self, line: str) -> str:
+        """Extracts an ISO-like timestamp from log line for chronological sorting."""
+        m = re.search(r'time="([^"]+)"', line)
+        if m:
+            return m.group(1)
+        m = re.match(r'^(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}[^\s]*)', line)
+        if m:
+            return m.group(1)
+        return ""
+
+    def _read_new_lines(self, path: str, offset: int) -> Tuple[List[str], int]:
+        if not os.path.exists(path):
+            return [], 0
+        try:
+            size = os.path.getsize(path)
+            if size < offset:
+                # File was truncated or rotated, reset offset to 0
+                offset = 0
+            if size == offset:
+                return [], offset
+
+            with open(path, "rb") as f:
+                f.seek(offset)
+                data = f.read()
+
+            if not data:
+                return [], offset
+
+            last_nl = data.rfind(b"\n")
+            if last_nl == -1:
+                # Incomplete line, wait for newline
+                return [], offset
+
+            valid_data = data[:last_nl + 1]
+            new_offset = offset + len(valid_data)
+            lines = valid_data.decode("utf-8", errors="ignore").splitlines()
+            return lines, new_offset
+        except Exception:
+            return [], offset
+
     def get_recent_logs(self, max_lines: int = 50) -> List[str]:
-        logs = []
+        if max_lines <= 0:
+            return []
+        entries = []
         if os.path.exists(self.sslocal_log):
             try:
                 with open(self.sslocal_log, "r", encoding="utf-8", errors="ignore") as f:
                     lines = f.readlines()
-                    logs.extend([f"[sslocal] {l.strip()}" for l in lines[-max_lines:]])
+                    for l in lines[-max_lines:]:
+                        s = l.strip()
+                        if s:
+                            entries.append((self._parse_timestamp(s), f"[sslocal] {s}"))
             except Exception:
                 pass
         if os.path.exists(self.tun2socks_log):
             try:
                 with open(self.tun2socks_log, "r", encoding="utf-8", errors="ignore") as f:
                     lines = f.readlines()
-                    logs.extend([f"[tun2socks] {l.strip()}" for l in lines[-max_lines:]])
+                    for l in lines[-max_lines:]:
+                        s = l.strip()
+                        if s:
+                            entries.append((self._parse_timestamp(s), f"[tun2socks] {s}"))
             except Exception:
                 pass
-        return logs[-max_lines:]
+
+        entries.sort(key=lambda x: x[0])
+        return [e[1] for e in entries[-max_lines:]]
+
+    def follow_logs(self, max_lines: int = 40) -> Generator[str, None, None]:
+        """
+        Stream logs continuously in real time. Yields up to max_lines initial entries,
+        then polls and streams newly appended lines from both sslocal and tun2socks.
+        """
+        if max_lines > 0:
+            initial = self.get_recent_logs(max_lines=max_lines)
+            for line in initial:
+                yield line
+
+        offset_ss = os.path.getsize(self.sslocal_log) if os.path.exists(self.sslocal_log) else 0
+        offset_tun = os.path.getsize(self.tun2socks_log) if os.path.exists(self.tun2socks_log) else 0
+
+        while True:
+            batch = []
+            new_ss, offset_ss = self._read_new_lines(self.sslocal_log, offset_ss)
+            for line in new_ss:
+                s = line.strip()
+                if s:
+                    batch.append((self._parse_timestamp(s), f"[sslocal] {s}"))
+
+            new_tun, offset_tun = self._read_new_lines(self.tun2socks_log, offset_tun)
+            for line in new_tun:
+                s = line.strip()
+                if s:
+                    batch.append((self._parse_timestamp(s), f"[tun2socks] {s}"))
+
+            if batch:
+                batch.sort(key=lambda x: x[0])
+                for _, formatted_line in batch:
+                    yield formatted_line
+
+            time.sleep(0.15)

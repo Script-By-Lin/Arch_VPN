@@ -104,14 +104,26 @@ class ConfigManager:
             json.dump(profiles, f, indent=2, ensure_ascii=False)
 
     def get_profile_by_id(self, profile_id: str) -> Optional[Dict[str, Any]]:
+        target_id = profile_id.strip().lower()
+        # 1. Exact match (case-insensitive)
         for p in self.get_profiles():
-            if p.get("id") == profile_id:
+            if p.get("id", "").lower() == target_id:
+                return p
+        # 2. Prefix match (e.g. first 4-7 chars)
+        for p in self.get_profiles():
+            if p.get("id", "").lower().startswith(target_id):
                 return p
         return None
 
     def get_profile_by_name(self, name: str) -> Optional[Dict[str, Any]]:
+        target_name = name.strip().lower()
+        # 1. Exact match (case-insensitive)
         for p in self.get_profiles():
-            if p.get("name", "").lower() == name.lower():
+            if p.get("name", "").lower() == target_name:
+                return p
+        # 2. Prefix or substring match
+        for p in self.get_profiles():
+            if target_name in p.get("name", "").lower():
                 return p
         return None
 

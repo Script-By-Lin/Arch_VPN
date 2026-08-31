@@ -65,17 +65,24 @@ passthru-vpn gui
 passthru-vpn import "ssconf://....#....#1"
 ```
 
-#### Connect to VPN
+#### Connect / Switch VPN Server
 
 ```bash
-# Connect using the imported key or active profile
-passthru-vpn connect
+# Connect to the selected/active profile
+shadowtun connect
 
-# Or connect directly with a key URL
-passthru-vpn connect "ssconf://...."
+# Switch / connect directly by Profile ID (full ID or prefix)
+shadowtun connect a1b2c3d4
+shadowtun switch a1b2c3d4
+
+# Switch by Profile Name
+shadowtun switch "Tokyo-Fast-01"
+
+# Connect directly with a key URL
+shadowtun connect "ssconf://...."
 
 # Connect and stream live traffic statistics
-passthru-vpn connect -m
+shadowtun connect -m
 ```
 
 #### Check Status
@@ -100,7 +107,14 @@ passthru-vpn disconnect
 #### View Real-Time Logs
 
 ```bash
-passthru-vpn logs
+# View recent logs (default 40 lines)
+shadowtun logs
+
+# Follow log output in real-time
+shadowtun logs -f
+
+# Follow log output with customized initial line count
+shadowtun logs -f -n 100
 ```
 
 ---

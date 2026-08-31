@@ -206,14 +206,30 @@ def cmd_test(args, service: VPNService):
             print(f"{RED}Unreachable / Timeout{RESET}")
 
 
+def format_log_entry(line: str) -> str:
+    if line.startswith("[sslocal]"):
+        return f"{CYAN}[sslocal]{RESET}" + line[len("[sslocal]"):]
+    elif line.startswith("[tun2socks]"):
+        return f"{YELLOW}[tun2socks]{RESET}" + line[len("[tun2socks]"):]
+    return line
+
+
 def cmd_logs(args, service: VPNService):
-    logs = service.process_mgr.get_recent_logs(max_lines=args.lines)
-    if not logs:
-        print(f"{DIM}No log entries found.{RESET}")
-        return
-    print(f"{BOLD}Recent VPN Logs:{RESET}")
-    for line in logs:
-        print(line)
+    if args.follow:
+        print(f"{CYAN}[*]{RESET} Streaming real-time VPN logs (Ctrl+C to stop)...")
+        try:
+            for line in service.process_mgr.follow_logs(max_lines=args.lines):
+                print(format_log_entry(line), flush=True)
+        except KeyboardInterrupt:
+            print(f"\n{DIM}Stopped following logs.{RESET}")
+    else:
+        logs = service.process_mgr.get_recent_logs(max_lines=args.lines)
+        if not logs:
+            print(f"{DIM}No log entries found.{RESET}")
+            return
+        print(f"{BOLD}Recent VPN Logs:{RESET}")
+        for line in logs:
+            print(format_log_entry(line))
 
 
 def cmd_gui(args, service: VPNService):
@@ -233,10 +249,15 @@ def main():
     )
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
-    # Connect
+    # Connect / Switch
     p_conn = subparsers.add_parser("connect", help="Connect to VPN (by key, profile ID, or name)")
     p_conn.add_argument("target", nargs="?", help="ssconf:// URL, ss:// URI, Profile ID, or Name")
     p_conn.add_argument("-m", "--monitor", action="store_true", help="Keep running and stream live traffic stats")
+
+    # Switch (Alias for connect)
+    p_switch = subparsers.add_parser("switch", help="Switch VPN server (by Profile ID or Name)")
+    p_switch.add_argument("target", help="Profile ID or Name to switch to")
+    p_switch.add_argument("-m", "--monitor", action="store_true", help="Keep running and stream live traffic stats")
 
     # Disconnect
     subparsers.add_parser("disconnect", help="Disconnect active VPN")
@@ -262,6 +283,7 @@ def main():
     # Logs
     p_logs = subparsers.add_parser("logs", help="View recent VPN core logs")
     p_logs.add_argument("-n", "--lines", type=int, default=40, help="Number of log lines to show")
+    p_logs.add_argument("-f", "--follow", action="store_true", help="Follow log stream in real time")
 
     # GUI
     subparsers.add_parser("gui", help="Launch the Modern Desktop GUI")
@@ -270,7 +292,7 @@ def main():
 
     service = VPNService()
 
-    if args.command == "connect":
+    if args.command in ("connect", "switch"):
         cmd_connect(args, service)
     elif args.command == "disconnect":
         cmd_disconnect(args, service)

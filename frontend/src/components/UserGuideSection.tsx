@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   BookOpen, 
@@ -23,6 +23,48 @@ export default function UserGuideSection() {
   const [searchQuery, setSearchQuery] = useState("");
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
+  useEffect(() => {
+    const handleHash = () => {
+      const hash = window.location.hash.toLowerCase().replace("#", "");
+      if (hash === "faq" || hash === "troubleshooting") {
+        setActiveTab("faq");
+      } else if (hash === "gui") {
+        setActiveTab("gui");
+      } else if (hash === "cli") {
+        setActiveTab("cli");
+      } else if (hash === "protocol") {
+        setActiveTab("protocol");
+      } else if (hash === "quickstart" || hash === "user-guide") {
+        setActiveTab("quickstart");
+      }
+    };
+
+    const handleCustomTab = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      const tab = customEvent.detail;
+      if (tab === "faq" || tab === "troubleshooting") {
+        setActiveTab("faq");
+      } else if (tab === "gui" || tab === "cli" || tab === "protocol" || tab === "quickstart") {
+        setActiveTab(tab as any);
+      }
+    };
+
+    handleHash();
+    window.addEventListener("hashchange", handleHash);
+    window.addEventListener("switch-userguide-tab", handleCustomTab);
+    return () => {
+      window.removeEventListener("hashchange", handleHash);
+      window.removeEventListener("switch-userguide-tab", handleCustomTab);
+    };
+  }, []);
+
+  const handleTabClick = (tabId: "quickstart" | "gui" | "cli" | "protocol" | "faq") => {
+    setActiveTab(tabId);
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", `#${tabId}`);
+    }
+  };
+
   const handleCopy = (text: string, index: number) => {
     navigator.clipboard.writeText(text);
     setCopiedIndex(index);
@@ -39,6 +81,14 @@ export default function UserGuideSection() {
 
   return (
     <section id="user-guide" className="py-20 md:py-28 relative bg-[#06080d]">
+      {/* Anchor targets for direct linking */}
+      <span id="faq" className="absolute -top-24" />
+      <span id="troubleshooting" className="absolute -top-24" />
+      <span id="cli" className="absolute -top-24" />
+      <span id="gui" className="absolute -top-24" />
+      <span id="protocol" className="absolute -top-24" />
+      <span id="quickstart" className="absolute -top-24" />
+
       <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Section Header */}
@@ -68,7 +118,8 @@ export default function UserGuideSection() {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                type="button"
+                onClick={() => handleTabClick(tab.id)}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
                   isActive
                     ? "bg-gradient-to-r from-cyan-500/20 to-purple-500/20 text-cyan-200 border border-cyan-400/50 shadow-lg shadow-cyan-950/40"
@@ -142,13 +193,13 @@ export default function UserGuideSection() {
                       <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-300 font-mono font-bold flex items-center justify-center text-sm mb-4 border border-emerald-500/30">
                         03
                       </div>
-                      <h4 className="text-base font-bold text-white mb-2">Connect & Route</h4>
+                      <h4 className="text-base font-bold text-white mb-2">Connect & Switch</h4>
                       <p className="text-xs text-slate-400 leading-relaxed mb-4">
-                        Click the glowing circular button in the GUI or launch via command line with live telemetry.
+                        Connect via CLI/GUI or switch active servers seamlessly by Profile ID with <code className="text-cyan-300 font-mono">shadowtun switch &lt;ID&gt;</code>.
                       </p>
                     </div>
                     <div className="p-3 rounded-xl bg-black font-mono text-[11px] text-emerald-300 overflow-x-auto border border-white/[0.04]">
-                      <code>shadowtun connect -m</code>
+                      <code>shadowtun switch a1b2c3d4</code>
                     </div>
                   </div>
                 </div>

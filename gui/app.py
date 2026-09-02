@@ -615,9 +615,46 @@ class MainWindow(QMainWindow):
         node_header.addWidget(self.btn_ping_refresh)
         nc_vbox.addLayout(node_header)
 
+        server_row = QHBoxLayout()
+        server_row.setSpacing(6)
+
         self.combo_servers = ModernDropdown("Select Server...")
         self.combo_servers.currentIndexChanged.connect(self.on_server_dropdown_changed)
-        nc_vbox.addWidget(self.combo_servers)
+        server_row.addWidget(self.combo_servers, 1)
+
+        self.btn_delete_server = QPushButton("🗑 Delete")
+        self.btn_delete_server.setCursor(Qt.PointingHandCursor)
+        self.btn_delete_server.setToolTip("Delete currently selected server profile")
+        self.btn_delete_server.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(239, 68, 68, 0.12);
+                color: #EF4444;
+                border: 1px solid rgba(239, 68, 68, 0.35);
+                border-radius: 8px;
+                padding: 8px 12px;
+                font-size: 11px;
+                font-weight: 700;
+                font-family: monospace;
+            }
+            QPushButton:hover {
+                background-color: #EF4444;
+                color: #FFFFFF;
+                border: 1px solid #EF4444;
+            }
+            QPushButton:pressed {
+                background-color: #DC2626;
+                color: #FFFFFF;
+            }
+            QPushButton:disabled {
+                background-color: #0C101A;
+                color: #475569;
+                border: 1px solid #1A2538;
+            }
+        """)
+        self.btn_delete_server.clicked.connect(self.on_delete_server)
+        server_row.addWidget(self.btn_delete_server)
+
+        nc_vbox.addLayout(server_row)
 
         # DNS Picker
         lbl_dns_title = QLabel("DNS UPSTREAM RESOLVER")
@@ -703,8 +740,10 @@ class MainWindow(QMainWindow):
         try:
             profile = self.service.config_mgr.parse_key(raw)
             saved = self.service.config_mgr.add_or_update_profile(profile)
+            self.service.config_mgr.set_active_profile(saved.get("id"))
             self.input_import_key.clear()
             self.update_profiles_list()
+            self.refresh_ui_state()
             self.append_ui_log(f"[IMPORT] Imported profile '{saved.get('name')}' successfully.")
             self.trigger_all_pings()
         except ConfigError as e:
@@ -734,6 +773,11 @@ class MainWindow(QMainWindow):
         active_id = self.service.config_mgr.get_active_profile_id()
         selected_index = 0
 
+        # If active_id is not in existing profiles, default to the first profile
+        if profiles and not any(p.get("id") == active_id for p in profiles):
+            active_id = profiles[0].get("id")
+            self.service.config_mgr.set_active_profile(active_id)
+
         for idx, p in enumerate(profiles):
             p_id = p.get("id", "")
             p_name = p.get("name", "Unnamed")
@@ -743,7 +787,59 @@ class MainWindow(QMainWindow):
 
         if profiles:
             self.combo_servers.setCurrentIndex(selected_index)
+            if hasattr(self, "btn_delete_server"):
+                self.btn_delete_server.setEnabled(True)
+        else:
+            if hasattr(self, "btn_delete_server"):
+                self.btn_delete_server.setEnabled(False)
+
         self.updating_combo = False
+
+    def on_delete_server(self):
+        idx = self.combo_servers.currentIndex()
+        if idx < 0:
+            QMessageBox.information(self, "No Server", "No server profile is currently selected.")
+            return
+
+        p_id = self.combo_servers.itemData(idx)
+        if not p_id:
+            active = self.service.config_mgr.get_active_profile()
+            if active:
+                p_id = active.get("id")
+
+        if not p_id:
+            QMessageBox.information(self, "No Server", "No server profile is currently selected.")
+            return
+
+        prof = self.service.config_mgr.get_profile_by_id(p_id)
+        name = prof.get("name", "Unnamed") if prof else "Selected Profile"
+        server = prof.get("server", "") if prof else ""
+        label = f"'{name}' ({server})" if server else f"'{name}'"
+
+        reply = QMessageBox.question(
+            self,
+            "Delete Server Profile",
+            f"Are you sure you want to delete server profile {label}?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        if reply != QMessageBox.Yes:
+            return
+
+        # If currently connected to this profile, disconnect cleanly first
+        active_id = self.service.config_mgr.get_active_profile_id()
+        if self.service.state == STATE_CONNECTED and active_id == p_id:
+            self.append_ui_log(f"[DISCONNECT] Disconnecting active tunnel before deleting {label}...")
+            self.service.disconnect()
+
+        deleted = self.service.config_mgr.delete_profile(p_id)
+        if deleted:
+            self.append_ui_log(f"[DELETE] Deleted server profile {label}")
+            self.update_profiles_list()
+            self.refresh_ui_state()
+            self.trigger_all_pings()
+        else:
+            QMessageBox.critical(self, "Error", f"Failed to delete profile {label}.")
 
     def on_connect_toggle(self):
         state = self.service.state
@@ -835,6 +931,7 @@ class MainWindow(QMainWindow):
     def trigger_all_pings(self):
         active = self.service.config_mgr.get_active_profile()
         if not active:
+            self.btn_ping_refresh.setText("⟳ Ping")
             return
         
         self.btn_ping_refresh.setText("⟳ Pinging...")

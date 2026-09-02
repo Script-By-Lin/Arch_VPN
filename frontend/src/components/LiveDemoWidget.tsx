@@ -9,7 +9,9 @@ import {
   ArrowUp, 
   RefreshCw, 
   Terminal, 
-  ChevronDown
+  ChevronDown,
+  Trash2,
+  RotateCcw
 } from "lucide-react";
 
 export default function LiveDemoWidget() {
@@ -19,6 +21,11 @@ export default function LiveDemoWidget() {
   const [uploadSpeed, setUploadSpeed] = useState("0.0");
   const [ping, setPing] = useState(24);
   const [pinging, setPinging] = useState(false);
+  const [servers, setServers] = useState<string[]>([
+    "Tokyo-Fast-01",
+    "Singapore-02",
+    "US-West-03"
+  ]);
   const [activeProfile, setActiveProfile] = useState("Tokyo-Fast-01");
   const [selectedDns, setSelectedDns] = useState("Cloudflare (1.1.1.1 / 1.0.0.1)");
   const [logs, setLogs] = useState<string[]>([
@@ -43,6 +50,10 @@ export default function LiveDemoWidget() {
       addLog("STATUS", "Tunnel terminated cleanly.");
     } else {
       // Connecting
+      if (!activeProfile) {
+        addLog("ERROR", "No active server node selected. Please restore nodes first.");
+        return;
+      }
       setConnecting(true);
       addLog("INIT", "Requesting privileged route setup from /usr/bin/vpn-core-helper...");
       
@@ -61,6 +72,7 @@ export default function LiveDemoWidget() {
   };
 
   const handlePingTest = () => {
+    if (!activeProfile) return;
     setPinging(true);
     addLog("PING", `Probing ${activeProfile} via TCP SYN/ACK handshake...`);
     setTimeout(() => {
@@ -69,6 +81,36 @@ export default function LiveDemoWidget() {
       setPinging(false);
       addLog("PING", `Response received from ${activeProfile}: ${newPing}ms (0% packet loss).`);
     }, 450);
+  };
+
+  const handleDeleteServer = () => {
+    if (!activeProfile) return;
+    const target = activeProfile;
+    const remaining = servers.filter((s) => s !== target);
+    setServers(remaining);
+    addLog("DELETE", `Deleted server profile '${target}'.`);
+
+    if (connected) {
+      setConnected(false);
+      setDownloadSpeed("0.0");
+      setUploadSpeed("0.0");
+      addLog("DISCONNECT", `Active tunnel node '${target}' deleted; disconnected.`);
+    }
+
+    if (remaining.length > 0) {
+      setActiveProfile(remaining[0]);
+      addLog("PROFILE", `Switched active node to ${remaining[0]}.`);
+    } else {
+      setActiveProfile("");
+      addLog("WARNING", "No server profiles remaining. Click Restore to reset default nodes.");
+    }
+  };
+
+  const handleResetServers = () => {
+    const defaults = ["Tokyo-Fast-01", "Singapore-02", "US-West-03"];
+    setServers(defaults);
+    setActiveProfile(defaults[0]);
+    addLog("CONFIG", "Default server profiles restored.");
   };
 
   // Live telemetry speed generator when connected
@@ -245,43 +287,69 @@ export default function LiveDemoWidget() {
               transition={{ duration: 0.5, delay: 0.1 }}
               className="p-5 sm:p-6 rounded-3xl bg-[#090d16]/95 border border-[#1a2538] hover:border-cyan-500/30 space-y-5 shadow-2xl backdrop-blur-xl"
             >
-              {/* Header with Ping Probe */}
+              {/* Header with Ping Probe & Server Delete Button */}
               <div className="flex items-center justify-between">
                 <span className="text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
                   ACTIVE SUBSCRIPTION NODE
                 </span>
-                <button
-                  onClick={handlePingTest}
-                  disabled={pinging}
-                  className="flex items-center gap-1.5 text-xs font-mono font-semibold text-cyan-400 hover:text-cyan-300 px-3 py-1 rounded-xl bg-cyan-500/10 border border-cyan-500/25 hover:border-cyan-400/50 transition-all cursor-pointer shadow-sm"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${pinging ? "animate-spin" : ""}`} />
-                  <span>Ping: {ping}ms</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handlePingTest}
+                    disabled={pinging || !activeProfile}
+                    className="flex items-center gap-1.5 text-xs font-mono font-semibold text-cyan-400 hover:text-cyan-300 px-3 py-1 rounded-xl bg-cyan-500/10 border border-cyan-500/25 hover:border-cyan-400/50 transition-all cursor-pointer shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${pinging ? "animate-spin" : ""}`} />
+                    <span>Ping: {activeProfile ? `${ping}ms` : "--"}</span>
+                  </button>
+                  <button
+                    onClick={handleDeleteServer}
+                    disabled={servers.length === 0}
+                    className="flex items-center gap-1.5 text-xs font-mono font-semibold text-rose-400 hover:text-rose-300 px-2.5 py-1 rounded-xl bg-rose-500/10 border border-rose-500/25 hover:border-rose-400/50 transition-all cursor-pointer shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                    title="Delete currently selected server profile"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete</span>
+                  </button>
+                </div>
               </div>
 
-              {/* Node Pills */}
-              <div className="grid grid-cols-3 gap-2 text-xs font-medium">
-                {["Tokyo-Fast-01", "Singapore-02", "US-West-03"].map((node) => {
-                  const isActive = activeProfile === node;
-                  return (
-                    <button
-                      key={node}
-                      onClick={() => {
-                        setActiveProfile(node);
-                        addLog("PROFILE", `Switched active node to ${node}.`);
-                      }}
-                      className={`py-2 px-2 rounded-xl text-center font-mono text-[11px] font-semibold transition-all cursor-pointer ${
-                        isActive
-                          ? "bg-cyan-500/20 text-cyan-300 border border-cyan-400/60 shadow-lg shadow-cyan-950/40"
-                          : "bg-[#060a12] text-slate-400 hover:text-slate-200 hover:bg-white/[0.04] border border-white/[0.06]"
-                      }`}
-                    >
-                      {node}
-                    </button>
-                  );
-                })}
-              </div>
+              {/* Node Pills or Empty State */}
+              {servers.length > 0 ? (
+                <div className="grid grid-cols-3 gap-2 text-xs font-medium">
+                  {servers.map((node) => {
+                    const isActive = activeProfile === node;
+                    return (
+                      <button
+                        key={node}
+                        onClick={() => {
+                          setActiveProfile(node);
+                          addLog("PROFILE", `Switched active node to ${node}.`);
+                        }}
+                        className={`py-2 px-2 rounded-xl text-center font-mono text-[11px] font-semibold transition-all cursor-pointer ${
+                          isActive
+                            ? "bg-cyan-500/20 text-cyan-300 border border-cyan-400/60 shadow-lg shadow-cyan-950/40"
+                            : "bg-[#060a12] text-slate-400 hover:text-slate-200 hover:bg-white/[0.04] border border-white/[0.06]"
+                        }`}
+                      >
+                        {node}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="p-3 rounded-xl bg-[#060a12] border border-dashed border-white/[0.1] text-center space-y-2">
+                  <span className="text-xs font-mono text-slate-400 block">
+                    No server profiles remaining.
+                  </span>
+                  <button
+                    onClick={handleResetServers}
+                    className="inline-flex items-center gap-1.5 text-[11px] font-mono font-bold text-cyan-400 hover:text-cyan-300 px-3 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/30 transition-colors cursor-pointer"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>Restore Default Nodes</span>
+                  </button>
+                </div>
+              )}
 
               {/* DNS Upstream Resolver Section */}
               <div>

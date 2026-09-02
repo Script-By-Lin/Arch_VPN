@@ -180,6 +180,30 @@ QPushButton.btn-primary:pressed {
     background-color: #0284C7;
 }
 
+QPushButton.btn-danger {
+    background-color: rgba(239, 68, 68, 0.12);
+    color: #EF4444;
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    font-weight: 700;
+}
+
+QPushButton.btn-danger:hover {
+    background-color: #EF4444;
+    color: #FFFFFF;
+    border-color: #EF4444;
+}
+
+QPushButton.btn-danger:pressed {
+    background-color: #DC2626;
+    color: #FFFFFF;
+}
+
+QPushButton.btn-danger:disabled {
+    background-color: #0C101A;
+    color: #475569;
+    border: 1px solid #1A2538;
+}
+
 /* Window Control Buttons */
 QPushButton.btn-win-control {
     background-color: transparent;

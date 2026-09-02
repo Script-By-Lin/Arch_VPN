@@ -401,4 +401,45 @@ QCheckBox::indicator:checked {
     background-color: #00E5FF;
     border-color: #00E5FF;
 }
+
+/* Dialogs & Alert Windows */
+QDialog {
+    background-color: #090D16;
+    color: #F8FAFC;
+    border: 1px solid #1A2538;
+    border-radius: 14px;
+}
+
+QMessageBox {
+    background-color: #090D16;
+    color: #F8FAFC;
+    border: 1px solid #1A2538;
+    border-radius: 12px;
+}
+
+QMessageBox QLabel {
+    color: #F8FAFC;
+    font-size: 12px;
+    background-color: transparent;
+}
+
+QMessageBox QPushButton {
+    background-color: #0C101A;
+    border: 1px solid #1A2538;
+    border-radius: 8px;
+    color: #F8FAFC;
+    padding: 7px 18px;
+    font-size: 12px;
+    font-weight: 600;
+    min-width: 68px;
+}
+
+QMessageBox QPushButton:hover {
+    background-color: #131A29;
+    border: 1px solid #00E5FF;
+}
+
+QMessageBox QPushButton:pressed {
+    background-color: #070B13;
+}
 """

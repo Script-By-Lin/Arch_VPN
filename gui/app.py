@@ -15,12 +15,13 @@ import threading
 from typing import Optional, Dict, Any
 
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QObject, QSize, QEvent, QRectF
-from PyQt5.QtGui import QColor, QFont, QPainter, QBrush, QPen, QIcon, QPixmap, QRadialGradient, QPainterPath
+from PyQt5.QtGui import QColor, QFont, QPainter, QBrush, QPen, QIcon, QPixmap, QRadialGradient, QPainterPath, QKeySequence
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QLineEdit, QScrollArea, QFrame, QTabWidget,
     QPlainTextEdit, QComboBox, QCheckBox, QMessageBox, QSystemTrayIcon,
-    QMenu, QAction, QSizePolicy, QSplitter, QListView
+    QMenu, QAction, QSizePolicy, QSplitter, QListView, QDialog,
+    QGraphicsDropShadowEffect, QShortcut
 )
 
 # Add project root to sys.path
@@ -279,6 +280,310 @@ class ModernDropdown(QPushButton):
             self._current_index = index
             self.setText(f"{self._items[index][0]}  ▾")
             self.currentIndexChanged.emit(index)
+
+
+class ModernDeleteConfirmDialog(QDialog):
+    """
+    Cyber-Obsidian styled confirmation modal for server profile deletion.
+    Displays profile metadata, active tunnel safety warning, and smooth
+    destructive action controls.
+    """
+    def __init__(self, profile_data: dict, is_connected: bool, is_active: bool, is_only: bool, parent=None):
+        super().__init__(parent)
+        self.profile_data = profile_data or {}
+        self.is_connected = is_connected
+        self.is_active = is_active
+        self.is_only = is_only
+        self._drag_pos = None
+
+        self.setModal(True)
+        self.setWindowFlags(Qt.Dialog | Qt.FramelessWindowHint)
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.setFixedWidth(450)
+        self.init_ui()
+
+    def init_ui(self):
+        root_layout = QVBoxLayout(self)
+        root_layout.setContentsMargins(12, 12, 12, 12)
+
+        # Main Card Container
+        self.container = QFrame(self)
+        self.container.setObjectName("ModernConfirmCard")
+        self.container.setStyleSheet("""
+            QFrame#ModernConfirmCard {
+                background-color: #090D16;
+                border: 1px solid rgba(239, 68, 68, 0.45);
+                border-radius: 14px;
+            }
+        """)
+
+        # Drop shadow effect
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(28)
+        shadow.setColor(QColor(0, 0, 0, 220))
+        shadow.setOffset(0, 8)
+        self.container.setGraphicsEffect(shadow)
+
+        card_vbox = QVBoxLayout(self.container)
+        card_vbox.setContentsMargins(20, 18, 20, 20)
+        card_vbox.setSpacing(14)
+
+        # 1. Header with Icon, Title & Close Button
+        header_hbox = QHBoxLayout()
+        header_hbox.setSpacing(12)
+
+        # Glowing Danger Icon Circle
+        icon_badge = QLabel("🗑")
+        icon_badge.setFixedSize(40, 40)
+        icon_badge.setAlignment(Qt.AlignCenter)
+        icon_badge.setStyleSheet("""
+            background-color: rgba(239, 68, 68, 0.14);
+            border: 1px solid rgba(239, 68, 68, 0.50);
+            border-radius: 20px;
+            font-size: 18px;
+            color: #EF4444;
+        """)
+        header_hbox.addWidget(icon_badge)
+
+        # Title and description
+        title_vbox = QVBoxLayout()
+        title_vbox.setSpacing(2)
+
+        lbl_title = QLabel("Delete Server Profile")
+        lbl_title.setStyleSheet("font-size: 15px; font-weight: 800; color: #FFFFFF; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;")
+        title_vbox.addWidget(lbl_title)
+
+        lbl_sub = QLabel("Are you sure you want to delete this configuration?")
+        lbl_sub.setStyleSheet("font-size: 11px; color: #94A3B8;")
+        title_vbox.addWidget(lbl_sub)
+
+        header_hbox.addLayout(title_vbox, 1)
+
+        # Close X Button
+        btn_close = QPushButton("✕")
+        btn_close.setFixedSize(26, 26)
+        btn_close.setCursor(Qt.PointingHandCursor)
+        btn_close.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                border: none;
+                color: #64748B;
+                font-size: 13px;
+                font-weight: bold;
+                border-radius: 6px;
+            }
+            QPushButton:hover {
+                background-color: rgba(239, 68, 68, 0.15);
+                color: #EF4444;
+            }
+        """)
+        btn_close.clicked.connect(self.reject)
+        header_hbox.addWidget(btn_close)
+
+        card_vbox.addLayout(header_hbox)
+
+        # 2. Server Metadata Box
+        prof_name = self.profile_data.get("name", "Unnamed Profile")
+        server_ip = self.profile_data.get("server", "Unknown Host")
+        server_port = self.profile_data.get("server_port", "")
+        method = self.profile_data.get("method", "aes-256-gcm")
+        prefix = self.profile_data.get("prefix", "")
+
+        info_frame = QFrame()
+        info_frame.setStyleSheet("""
+            QFrame {
+                background-color: #05080F;
+                border: 1px solid #1A2538;
+                border-radius: 10px;
+                padding: 10px;
+            }
+        """)
+        info_vbox = QVBoxLayout(info_frame)
+        info_vbox.setContentsMargins(12, 10, 12, 10)
+        info_vbox.setSpacing(8)
+
+        lbl_prof_name = QLabel(f"<b>Profile:</b> {prof_name}")
+        lbl_prof_name.setStyleSheet("font-size: 12px; color: #FFFFFF; font-weight: 600;")
+        info_vbox.addWidget(lbl_prof_name)
+
+        badges_hbox = QHBoxLayout()
+        badges_hbox.setSpacing(8)
+
+        endpoint_str = f"🌐 {server_ip}" + (f":{server_port}" if server_port else "")
+        lbl_endpoint = QLabel(endpoint_str)
+        lbl_endpoint.setStyleSheet("""
+            background-color: rgba(0, 229, 255, 0.08);
+            color: #38BDF8;
+            border: 1px solid rgba(0, 229, 255, 0.25);
+            border-radius: 6px;
+            padding: 3px 8px;
+            font-size: 10px;
+            font-family: monospace;
+            font-weight: 600;
+        """)
+        badges_hbox.addWidget(lbl_endpoint)
+
+        lbl_method = QLabel(f"🔒 {method}")
+        lbl_method.setStyleSheet("""
+            background-color: rgba(167, 139, 250, 0.08);
+            color: #C084FC;
+            border: 1px solid rgba(167, 139, 250, 0.25);
+            border-radius: 6px;
+            padding: 3px 8px;
+            font-size: 10px;
+            font-family: monospace;
+            font-weight: 600;
+        """)
+        badges_hbox.addWidget(lbl_method)
+
+        if prefix:
+            lbl_anti = QLabel("🛡️ Anti-DPI")
+            lbl_anti.setStyleSheet("""
+                background-color: rgba(16, 185, 129, 0.08);
+                color: #34D399;
+                border: 1px solid rgba(16, 185, 129, 0.25);
+                border-radius: 6px;
+                padding: 3px 8px;
+                font-size: 10px;
+                font-family: monospace;
+                font-weight: 600;
+            """)
+            badges_hbox.addWidget(lbl_anti)
+
+        badges_hbox.addStretch(1)
+        info_vbox.addLayout(badges_hbox)
+
+        card_vbox.addWidget(info_frame)
+
+        # 3. Contextual Warning (Active Connection / Last Profile)
+        if self.is_connected:
+            warn_frame = QFrame()
+            warn_frame.setStyleSheet("""
+                QFrame {
+                    background-color: rgba(239, 68, 68, 0.12);
+                    border: 1px solid rgba(239, 68, 68, 0.45);
+                    border-radius: 8px;
+                    padding: 8px;
+                }
+            """)
+            warn_hbox = QHBoxLayout(warn_frame)
+            warn_hbox.setContentsMargins(10, 8, 10, 8)
+            warn_hbox.setSpacing(8)
+
+            lbl_warn_ico = QLabel("⚠️")
+            lbl_warn_ico.setStyleSheet("font-size: 15px; background: transparent;")
+            warn_hbox.addWidget(lbl_warn_ico)
+
+            lbl_warn_msg = QLabel("<b>Active Tunnel Warning:</b> You are currently connected to this server. Deleting it will immediately terminate the VPN connection.")
+            lbl_warn_msg.setStyleSheet("color: #FCA5A5; font-size: 11px; background: transparent;")
+            lbl_warn_msg.setWordWrap(True)
+            warn_hbox.addWidget(lbl_warn_msg, 1)
+
+            card_vbox.addWidget(warn_frame)
+        elif self.is_only:
+            notice_frame = QFrame()
+            notice_frame.setStyleSheet("""
+                QFrame {
+                    background-color: rgba(245, 158, 11, 0.10);
+                    border: 1px solid rgba(245, 158, 11, 0.35);
+                    border-radius: 8px;
+                    padding: 8px;
+                }
+            """)
+            notice_hbox = QHBoxLayout(notice_frame)
+            notice_hbox.setContentsMargins(10, 8, 10, 8)
+            notice_hbox.setSpacing(8)
+
+            lbl_notice_ico = QLabel("ℹ️")
+            lbl_notice_ico.setStyleSheet("font-size: 14px; background: transparent;")
+            notice_hbox.addWidget(lbl_notice_ico)
+
+            lbl_notice_msg = QLabel("This is your only configured server profile. You will need to import a new profile to connect.")
+            lbl_notice_msg.setStyleSheet("color: #FCD34D; font-size: 11px; background: transparent;")
+            lbl_notice_msg.setWordWrap(True)
+            notice_hbox.addWidget(lbl_notice_msg, 1)
+
+            card_vbox.addWidget(notice_frame)
+
+        # 4. Action Buttons
+        btn_hbox = QHBoxLayout()
+        btn_hbox.setSpacing(10)
+
+        self.btn_cancel = QPushButton("Cancel")
+        self.btn_cancel.setCursor(Qt.PointingHandCursor)
+        self.btn_cancel.setFixedHeight(38)
+        self.btn_cancel.setStyleSheet("""
+            QPushButton {
+                background-color: #0E1422;
+                border: 1px solid #1E293B;
+                border-radius: 8px;
+                color: #94A3B8;
+                font-size: 12px;
+                font-weight: 600;
+                padding: 0 16px;
+            }
+            QPushButton:hover {
+                background-color: #162035;
+                color: #FFFFFF;
+                border: 1px solid #334155;
+            }
+            QPushButton:pressed {
+                background-color: #090D16;
+            }
+        """)
+        self.btn_cancel.clicked.connect(self.reject)
+        self.btn_cancel.setDefault(True)  # Protect against accidental deletion
+        btn_hbox.addWidget(self.btn_cancel)
+
+        self.btn_delete = QPushButton("🗑 Delete Profile")
+        self.btn_delete.setCursor(Qt.PointingHandCursor)
+        self.btn_delete.setFixedHeight(38)
+        self.btn_delete.setStyleSheet("""
+            QPushButton {
+                background-color: #DC2626;
+                border: 1px solid #EF4444;
+                border-radius: 8px;
+                color: #FFFFFF;
+                font-size: 12px;
+                font-weight: 700;
+                padding: 0 18px;
+            }
+            QPushButton:hover {
+                background-color: #EF4444;
+                border: 1px solid #F87171;
+            }
+            QPushButton:pressed {
+                background-color: #B91C1C;
+            }
+        """)
+        self.btn_delete.clicked.connect(self.accept)
+        btn_hbox.addWidget(self.btn_delete)
+
+        card_vbox.addLayout(btn_hbox)
+        root_layout.addWidget(self.container)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self._drag_pos = event.globalPos() - self.frameGeometry().topLeft()
+            event.accept()
+
+    def mouseMoveEvent(self, event):
+        if event.buttons() == Qt.LeftButton and self._drag_pos is not None:
+            self.move(event.globalPos() - self._drag_pos)
+            event.accept()
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Escape:
+            self.reject()
+        elif event.key() in (Qt.Key_Return, Qt.Key_Enter):
+            if self.btn_delete.hasFocus():
+                self.accept()
+            elif self.btn_cancel.hasFocus():
+                self.reject()
+            else:
+                self.accept()
+        else:
+            super().keyPressEvent(event)
 
 
 class ProfileRowWidget(QFrame):
@@ -624,35 +929,42 @@ class MainWindow(QMainWindow):
 
         self.btn_delete_server = QPushButton("🗑 Delete")
         self.btn_delete_server.setCursor(Qt.PointingHandCursor)
-        self.btn_delete_server.setToolTip("Delete currently selected server profile")
+        self.btn_delete_server.setToolTip("Delete currently selected server profile (Del)")
+        self.btn_delete_server.setFixedHeight(38)
         self.btn_delete_server.setStyleSheet("""
             QPushButton {
-                background-color: rgba(239, 68, 68, 0.12);
+                background-color: rgba(239, 68, 68, 0.10);
                 color: #EF4444;
                 border: 1px solid rgba(239, 68, 68, 0.35);
                 border-radius: 8px;
-                padding: 8px 12px;
+                padding: 0px 14px;
                 font-size: 11px;
                 font-weight: 700;
                 font-family: monospace;
+                letter-spacing: 0.3px;
             }
             QPushButton:hover {
-                background-color: #EF4444;
-                color: #FFFFFF;
+                background-color: rgba(239, 68, 68, 0.22);
+                color: #FCA5A5;
                 border: 1px solid #EF4444;
             }
             QPushButton:pressed {
                 background-color: #DC2626;
                 color: #FFFFFF;
+                border: 1px solid #DC2626;
             }
             QPushButton:disabled {
-                background-color: #0C101A;
-                color: #475569;
-                border: 1px solid #1A2538;
+                background-color: #070B13;
+                color: #334155;
+                border: 1px solid #131B29;
             }
         """)
         self.btn_delete_server.clicked.connect(self.on_delete_server)
         server_row.addWidget(self.btn_delete_server)
+
+        # Global Delete Shortcut
+        shortcut_del = QShortcut(QKeySequence(Qt.Key_Delete), self)
+        shortcut_del.activated.connect(self.on_delete_server)
 
         nc_vbox.addLayout(server_row)
 
@@ -795,13 +1107,19 @@ class MainWindow(QMainWindow):
 
         self.updating_combo = False
 
-    def on_delete_server(self):
-        idx = self.combo_servers.currentIndex()
-        if idx < 0:
-            QMessageBox.information(self, "No Server", "No server profile is currently selected.")
-            return
+    def on_delete_server(self, target_prof: Optional[dict] = None):
+        p_id = None
+        prof = None
 
-        p_id = self.combo_servers.itemData(idx)
+        if target_prof and isinstance(target_prof, dict):
+            p_id = target_prof.get("id")
+            prof = target_prof
+
+        if not p_id:
+            idx = self.combo_servers.currentIndex()
+            if idx >= 0:
+                p_id = self.combo_servers.itemData(idx)
+
         if not p_id:
             active = self.service.config_mgr.get_active_profile()
             if active:
@@ -811,25 +1129,32 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "No Server", "No server profile is currently selected.")
             return
 
-        prof = self.service.config_mgr.get_profile_by_id(p_id)
+        if not prof:
+            prof = self.service.config_mgr.get_profile_by_id(p_id)
+
         name = prof.get("name", "Unnamed") if prof else "Selected Profile"
         server = prof.get("server", "") if prof else ""
         label = f"'{name}' ({server})" if server else f"'{name}'"
 
-        reply = QMessageBox.question(
-            self,
-            "Delete Server Profile",
-            f"Are you sure you want to delete server profile {label}?",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
+        active_id = self.service.config_mgr.get_active_profile_id()
+        is_active_profile = (active_id == p_id)
+        is_tunnel_connected = (self.service.state == STATE_CONNECTED and is_active_profile)
+        is_only_profile = (self.combo_servers.count() <= 1)
+
+        # Launch modern Cyber-Obsidian confirmation modal
+        dialog = ModernDeleteConfirmDialog(
+            profile_data=prof or {"name": name, "server": server},
+            is_connected=is_tunnel_connected,
+            is_active=is_active_profile,
+            is_only=is_only_profile,
+            parent=self
         )
-        if reply != QMessageBox.Yes:
+        if dialog.exec_() != QDialog.Accepted:
             return
 
         # If currently connected to this profile, disconnect cleanly first
-        active_id = self.service.config_mgr.get_active_profile_id()
-        if self.service.state == STATE_CONNECTED and active_id == p_id:
-            self.append_ui_log(f"[DISCONNECT] Disconnecting active tunnel before deleting {label}...")
+        if is_tunnel_connected:
+            self.append_ui_log(f"[DISCONNECT] Terminating active tunnel before deleting {label}...")
             self.service.disconnect()
 
         deleted = self.service.config_mgr.delete_profile(p_id)

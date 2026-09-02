@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { 
   Power, 
   Activity, 
@@ -11,7 +11,9 @@ import {
   Terminal, 
   ChevronDown,
   Trash2,
-  RotateCcw
+  RotateCcw,
+  X,
+  AlertTriangle
 } from "lucide-react";
 
 export default function LiveDemoWidget() {
@@ -28,6 +30,7 @@ export default function LiveDemoWidget() {
   ]);
   const [activeProfile, setActiveProfile] = useState("Tokyo-Fast-01");
   const [selectedDns, setSelectedDns] = useState("Cloudflare (1.1.1.1 / 1.0.0.1)");
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [logs, setLogs] = useState<string[]>([
     "[12:00:00] [STATUS] ShadowTun GUI ready.",
     "[12:00:01] [PROFILE] Active node: Tokyo-Fast-01 (198.51.100.42:8443).",
@@ -239,53 +242,48 @@ export default function LiveDemoWidget() {
               </div>
             </div>
 
-            {/* Bottom Live Speed Counters Split Box */}
-            <div className="grid grid-cols-2 gap-4 pt-5 border-t border-white/[0.06]">
-              
-              {/* Download Speed Card */}
-              <div className="p-4 rounded-2xl bg-[#060a12]/80 border border-white/[0.06] flex items-center gap-3.5 shadow-inner">
-                <div className="w-10 h-10 rounded-xl bg-cyan-500/15 text-cyan-400 flex items-center justify-center flex-shrink-0">
-                  <ArrowDown className="w-5 h-5" />
+            {/* Speeds Telemetry Readouts */}
+            <div className="grid grid-cols-2 gap-3 mt-4">
+              <div className="p-3.5 rounded-2xl bg-[#060a12] border border-white/[0.06] flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 shrink-0">
+                  <ArrowDown className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="text-[10px] uppercase font-mono tracking-wider text-slate-400 block mb-0.5">
-                    DOWNLOAD SPEED
-                  </span>
-                  <div className="text-lg sm:text-xl font-mono font-bold text-white tracking-tight">
-                    {downloadSpeed} <span className="text-xs text-cyan-400 font-normal">MB/s</span>
+                  <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wider font-semibold">
+                    Download
+                  </div>
+                  <div className="text-base sm:text-lg font-mono font-bold text-white">
+                    {downloadSpeed} <span className="text-xs text-slate-400">MB/s</span>
                   </div>
                 </div>
               </div>
 
-              {/* Upload Speed Card */}
-              <div className="p-4 rounded-2xl bg-[#060a12]/80 border border-white/[0.06] flex items-center gap-3.5 shadow-inner">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center flex-shrink-0">
-                  <ArrowUp className="w-5 h-5" />
+              <div className="p-3.5 rounded-2xl bg-[#060a12] border border-white/[0.06] flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
+                  <ArrowUp className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="text-[10px] uppercase font-mono tracking-wider text-slate-400 block mb-0.5">
-                    UPLOAD SPEED
-                  </span>
-                  <div className="text-lg sm:text-xl font-mono font-bold text-white tracking-tight">
-                    {uploadSpeed} <span className="text-xs text-emerald-400 font-normal">MB/s</span>
+                  <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wider font-semibold">
+                    Upload
+                  </div>
+                  <div className="text-base sm:text-lg font-mono font-bold text-white">
+                    {uploadSpeed} <span className="text-xs text-slate-400">MB/s</span>
                   </div>
                 </div>
               </div>
-
             </div>
-
           </motion.div>
 
-          {/* RIGHT COLUMN: Active Node, DNS Upstream & Live Log Stream */}
-          <div className="lg:col-span-5 flex flex-col justify-between space-y-5">
+          {/* RIGHT: Node Controls & Live Stream (7 Cols) */}
+          <div className="xl:col-span-7 flex flex-col gap-6">
             
-            {/* Top Card: Active Subscription Node & DNS Selector */}
+            {/* Control Deck (Nodes + DNS) */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: 0.1 }}
-              className="p-5 sm:p-6 rounded-3xl bg-[#090d16]/95 border border-[#1a2538] hover:border-cyan-500/30 space-y-5 shadow-2xl backdrop-blur-xl"
+              className="p-5 sm:p-6 rounded-3xl bg-[#090d16]/95 border border-[#1a2538] shadow-2xl backdrop-blur-xl space-y-4"
             >
               {/* Header with Ping Probe & Server Delete Button */}
               <div className="flex items-center justify-between">
@@ -302,12 +300,12 @@ export default function LiveDemoWidget() {
                     <span>Ping: {activeProfile ? `${ping}ms` : "--"}</span>
                   </button>
                   <button
-                    onClick={handleDeleteServer}
-                    disabled={servers.length === 0}
-                    className="flex items-center gap-1.5 text-xs font-mono font-semibold text-rose-400 hover:text-rose-300 px-2.5 py-1 rounded-xl bg-rose-500/10 border border-rose-500/25 hover:border-rose-400/50 transition-all cursor-pointer shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                    onClick={() => setShowDeleteModal(true)}
+                    disabled={servers.length === 0 || !activeProfile}
+                    className="group flex items-center gap-1.5 text-xs font-mono font-semibold text-rose-400 hover:text-rose-200 px-3 py-1 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/25 hover:border-rose-400/50 transition-all cursor-pointer shadow-sm hover:shadow-rose-950/40 disabled:opacity-40 disabled:cursor-not-allowed"
                     title="Delete currently selected server profile"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Trash2 className="w-3.5 h-3.5 transition-transform group-hover:scale-110" />
                     <span>Delete</span>
                   </button>
                 </div>
@@ -435,6 +433,108 @@ export default function LiveDemoWidget() {
         </div>
 
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {showDeleteModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowDeleteModal(false)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+
+            {/* Modal Box */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ duration: 0.15 }}
+              className="relative w-full max-w-md bg-[#090d16] border border-rose-500/40 rounded-2xl p-6 shadow-2xl shadow-rose-950/40 space-y-4 z-10"
+            >
+              {/* Header */}
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-rose-500/15 border border-rose-500/40 flex items-center justify-center text-rose-400 shadow-inner">
+                    <Trash2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white font-mono">
+                      Delete Server Profile
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      Are you sure you want to remove this profile?
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  className="text-slate-500 hover:text-slate-300 p-1 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Profile Details Card */}
+              <div className="p-3.5 rounded-xl bg-[#05080f] border border-[#1a2538] space-y-2">
+                <div className="text-xs font-mono font-semibold text-slate-200">
+                  Profile: <span className="text-white font-bold">{activeProfile}</span>
+                </div>
+                <div className="flex flex-wrap gap-2 text-[11px] font-mono">
+                  <span className="px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-300 border border-cyan-500/25">
+                    🌐 198.51.100.42:8443
+                  </span>
+                  <span className="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-300 border border-purple-500/25">
+                    🔒 chacha20-ietf-poly1305
+                  </span>
+                </div>
+              </div>
+
+              {/* Contextual Warning */}
+              {connected && (
+                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-start gap-2.5">
+                  <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-rose-300 font-medium leading-relaxed">
+                    <strong className="font-semibold text-rose-200">Active Tunnel Warning:</strong> This server currently routes all your traffic. Deleting it will immediately terminate the active connection.
+                  </p>
+                </div>
+              )}
+
+              {servers.length === 1 && !connected && (
+                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-2.5">
+                  <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-amber-300 font-medium leading-relaxed">
+                    This is your only remaining server profile. You can click &apos;Restore Default Nodes&apos; afterwards to re-populate.
+                  </p>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-2.5 pt-2">
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-white/10 hover:border-white/20 transition-all text-xs font-semibold font-mono cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    handleDeleteServer();
+                  }}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-semibold text-xs font-mono border border-rose-400/50 shadow-lg shadow-rose-950/50 flex items-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete Profile</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </section>
   );
 }

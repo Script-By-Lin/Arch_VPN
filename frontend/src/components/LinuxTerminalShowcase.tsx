@@ -23,7 +23,7 @@ export default function LinuxTerminalShowcase() {
       activeTab === "fastfetch" 
         ? "fastfetch --structure Title:OS:Kernel:Uptime:Packages:Shell:DE:Terminal:Network"
         : activeTab === "dmesg"
-        ? "sudo dmesg -w --facility=daemon,kern | grep -E 'tun|shadowtun|sslocal'"
+        ? "sudo dmesg -w --facility=daemon,kern | grep -E 'tun|auralink|sslocal'"
         : "ip -brief address show && ip route show default";
 
     let idx = 0;
@@ -111,7 +111,7 @@ export default function LinuxTerminalShowcase() {
               <div className="w-3 h-3 rounded-full bg-amber-500/80 shadow-sm" />
               <div className="w-3 h-3 rounded-full bg-emerald-500/80 shadow-sm" />
               <span className="text-xs text-slate-400 ml-2 font-mono">
-                bit@cachyos-arch: ~/shadowtun
+                bit@cachyos-arch: ~/auralink
               </span>
             </div>
 
@@ -132,7 +132,7 @@ export default function LinuxTerminalShowcase() {
             <div className="flex items-center gap-2 text-slate-300 flex-wrap">
               <span className="text-emerald-400 font-bold">bit@cachyos</span>
               <span className="text-slate-500">:</span>
-              <span className="text-cyan-400 font-semibold">~/shadowtun</span>
+              <span className="text-cyan-400 font-semibold">~/auralink</span>
               <span className="text-slate-400">$</span>
               <span className="text-white font-mono">{typedCommand}</span>
               <span className={`w-2 h-4 bg-cyan-400 ${cursorVisible ? "opacity-100" : "opacity-0"}`} />
@@ -147,10 +147,10 @@ export default function LinuxTerminalShowcase() {
                 transition={{ duration: 0.3 }}
                 className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center pt-2"
               >
-                {/* ASCII Art Logo (Arch / ShadowTun Tux) */}
+                {/* ASCII Art Logo (Arch / AuraLink Tux) */}
                 <div className="md:col-span-5 text-cyan-400 font-mono text-xs sm:text-sm leading-tight select-none">
                   <pre className="text-cyan-300 drop-shadow-[0_0_12px_rgba(0,229,255,0.4)]">
-{`       /\\         ShadowTun Linux
+{`       /\\         AuraLink Linux
       /  \\        ----------------
      /\\   \\       OS: Arch Linux x86_64
     /      \\      Host: Linux Workstation
@@ -218,13 +218,13 @@ export default function LinuxTerminalShowcase() {
                 <div className="text-slate-500">[    0.000000] Linux version 6.12.9-cachyos (gcc 14.2.1) #1 SMP PREEMPT_DYNAMIC</div>
                 <div className="text-slate-400">[    1.102840] <span className="text-cyan-300">tun:</span> Universal TUN/TAP device driver, 1.6</div>
                 <div className="text-slate-400">[    1.102842] <span className="text-cyan-300">tun:</span> (C) 1999-2002 Maxim Krasnyansky &lt;maxk@qualcomm.com&gt;</div>
-                <div className="text-emerald-400">[   42.189201] shadowtun[1204]: privileged helper executing /usr/local/bin/vpn-core-helper</div>
+                <div className="text-emerald-400">[   42.189201] auralink[1204]: privileged helper executing /usr/local/bin/vpn-core-helper</div>
                 <div className="text-cyan-300">[   42.204510] tun0: link becomes ready, MTU set to 1500</div>
                 <div className="text-emerald-400">[   42.215090] tun2socks[1210]: device=tun0, proxy=socks5://127.0.0.1:1080, mtu=1500</div>
                 <div className="text-purple-300">[   42.228940] sslocal[1209]: listening TCP/UDP on 127.0.0.1:1080 (AEAD chacha20-poly1305)</div>
                 <div className="text-amber-300">[   42.240105] iproute2: route replace 198.51.100.42/32 via 192.168.1.1 dev wlan0 (pinned)</div>
                 <div className="text-cyan-300">[   42.251400] systemd-resolved[450]: Using DNS server 1.1.1.1 for interface tun0 (~.)</div>
-                <div className="text-emerald-400 font-bold">[   42.260800] shadowtun: full-tunnel connection established. Zero packet leaks.</div>
+                <div className="text-emerald-400 font-bold">[   42.260800] auralink: full-tunnel connection established. Zero packet leaks.</div>
               </motion.div>
             )}
 

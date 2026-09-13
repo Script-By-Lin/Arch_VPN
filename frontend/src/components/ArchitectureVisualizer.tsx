@@ -22,7 +22,7 @@ export default function ArchitectureVisualizer() {
             System & Network Architecture
           </h2>
           <p className="mt-3 text-slate-300 text-sm sm:text-base">
-            Inspect how ShadowTun intercepts Layer-3 packets at the Linux kernel boundary and bridges them into encrypted SOCKS5 streams.
+            Inspect how AuraLink intercepts Layer-3 packets at the Linux kernel boundary and bridges them into encrypted SOCKS5 streams.
           </p>
         </div>
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CLI Interface for ShadowTun Linux VPN.
+CLI Interface for AuraLink Linux VPN.
 Provides rich interactive and non-interactive command line management.
 """
 
@@ -39,7 +39,7 @@ RESET = "\033[0m"
 def print_banner():
     print(f"""{CYAN}{BOLD}
     ╔═══════════════════════════════════════════════╗
-    ║          ShadowTun Linux VPN Client           ║
+    ║          AuraLink Linux VPN Client            ║
     ║   Cross-Distro Shadowsocks + tun2socks VPN    ║
     ╚═══════════════════════════════════════════════╝{RESET}
 """)
@@ -128,7 +128,7 @@ def cmd_import(args, service: VPNService):
         print(f"    Method : {saved['method']}")
         if saved.get("prefix"):
             print(f"    Prefix : Enabled (Anti-Censorship)")
-        print(f"\nTo connect: {BOLD}shadowtun-vpn connect {saved['id']}{RESET}")
+        print(f"\nTo connect: {BOLD}auralink connect {saved['id']}{RESET}")
     except ConfigError as e:
         print(f"{RED}{BOLD}[✗] Import failed:{RESET}\n{e}")
         sys.exit(1)
@@ -140,7 +140,7 @@ def cmd_list(args, service: VPNService):
     active_id = settings.get("active_profile_id")
 
     if not profiles:
-        print(f"{YELLOW}No saved profiles.{RESET} Import one using: {BOLD}shadowtun-vpn import <key>{RESET}")
+        print(f"{YELLOW}No saved profiles.{RESET} Import one using: {BOLD}auralink import <key>{RESET}")
         return
 
     print(f"\n{BOLD}Saved VPN Profiles ({len(profiles)}):{RESET}")
@@ -244,7 +244,7 @@ def cmd_gui(args, service: VPNService):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="ShadowTun Linux VPN Client",
+        description="AuraLink Linux VPN Client",
         formatter_class=argparse.RawTextHelpFormatter
     )
     subparsers = parser.add_subparsers(dest="command", help="Available commands")

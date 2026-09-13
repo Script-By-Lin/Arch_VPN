@@ -37,7 +37,7 @@ export default function AboutSection() {
       color: "from-purple-500 to-indigo-600",
       glow: "rgba(139, 92, 246, 0.2)",
       metric: "100% TCP/UDP Captured",
-      description: "Unlike browser-only SOCKS5 proxies, ShadowTun provisions a real Layer-3 tun0 network interface. All system traffic—including games, terminal commands, Docker, and background daemons—is transparently captured."
+      description: "Unlike browser-only SOCKS5 proxies, AuraLink provisions a real Layer-3 tun0 network interface. All system traffic—including games, terminal commands, Docker, and background daemons—is transparently captured."
     },
     {
       icon: Lock,
@@ -127,14 +127,14 @@ export default function AboutSection() {
             </motion.div>
 
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white tracking-tight leading-tight">
-              Why ShadowTun is{" "}
+              Why AuraLink is{" "}
               <span className="bg-gradient-to-r from-cyan-400 via-teal-300 to-emerald-400 bg-clip-text text-transparent">
                 Built Different
               </span>
             </h2>
 
             <p className="mt-4 text-slate-300 text-base sm:text-lg leading-relaxed">
-              Standard proxies require per-app configuration and leak DNS queries. ShadowTun bridges the gap between lightweight Shadowsocks encryption and full-system VPN tunneling.
+              Standard proxies require per-app configuration and leak DNS queries. AuraLink bridges the gap between lightweight Shadowsocks encryption and full-system VPN tunneling.
             </p>
           </div>
 

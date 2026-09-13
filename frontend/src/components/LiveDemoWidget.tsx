@@ -32,7 +32,7 @@ export default function LiveDemoWidget() {
   const [selectedDns, setSelectedDns] = useState("Cloudflare (1.1.1.1 / 1.0.0.1)");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [logs, setLogs] = useState<string[]>([
-    "[12:00:00] [STATUS] ShadowTun GUI ready.",
+    "[12:00:00] [STATUS] AuraLink GUI ready.",
     "[12:00:01] [PROFILE] Active node: Tokyo-Fast-01 (198.51.100.42:8443).",
     "[12:00:02] [IDLE] System using standard physical route (192.168.1.1)."
   ]);
@@ -69,7 +69,7 @@ export default function LiveDemoWidget() {
         addLog("ROUTING", "Default route hijacked -> tun0. Pinned server route via wlan0.");
         setConnecting(false);
         setConnected(true);
-        addLog("SUCCESS", "ShadowTun connected! 100% full-tunnel active.");
+        addLog("SUCCESS", "AuraLink connected! 100% full-tunnel active.");
       }, 1000);
     }
   };
@@ -143,7 +143,7 @@ export default function LiveDemoWidget() {
             <span>Interactive Live Simulation</span>
           </div>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white tracking-tight">
-            Try ShadowTun in Your Browser
+            Try AuraLink in Your Browser
           </h2>
           <p className="mt-3 text-slate-300 text-sm sm:text-base">
             Test the PyQt5 GUI connection switch, live telemetry counters, ping latency testing, and DNS sinkhole behavior interactively.
@@ -153,7 +153,7 @@ export default function LiveDemoWidget() {
         {/* The Enhanced GUI Simulator Container */}
         <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
           
-          {/* LEFT WINDOW: ShadowTun GUI Client */}
+          {/* LEFT WINDOW: AuraLink GUI Client */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -168,7 +168,7 @@ export default function LiveDemoWidget() {
                 <div className="w-3 h-3 rounded-full bg-[#f59e0b] shadow-sm shadow-amber-950" />
                 <div className="w-3 h-3 rounded-full bg-[#10b981] shadow-sm shadow-emerald-950" />
                 <span className="text-xs font-mono font-medium text-slate-300 ml-2">
-                  ShadowTun GUI
+                  AuraLink GUI
                 </span>
               </div>
               

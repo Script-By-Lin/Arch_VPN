@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Process Manager for ShadowTun Linux VPN.
+Process Manager for AuraLink Linux VPN.
 Manages sslocal and tun2socks processes, PID tracking, socket readiness checks,
 and graceful termination.
 """
@@ -15,8 +15,8 @@ import shutil
 import re
 from typing import Optional, List, Tuple, Generator
 
-STATE_DIR = os.path.expanduser("~/.config/shadowtun/state")
-LOG_DIR = os.path.expanduser("~/.config/shadowtun/logs")
+STATE_DIR = os.path.expanduser("~/.config/auralink/state")
+LOG_DIR = os.path.expanduser("~/.config/auralink/logs")
 
 
 class ProcessError(Exception):

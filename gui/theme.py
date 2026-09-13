@@ -1,6 +1,6 @@
 """
-Cyber-Obsidian Theme and QSS Stylesheet for ShadowTun Linux VPN.
-Matches the modern, high-contrast dark aesthetic of the ShadowTun web interface.
+Cyber-Obsidian Theme and QSS Stylesheet for AuraLink Linux VPN.
+Matches the modern, high-contrast dark aesthetic of the AuraLink web interface.
 """
 
 PALETTE = {

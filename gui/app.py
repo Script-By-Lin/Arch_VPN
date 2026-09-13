@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Cyber-Obsidian Desktop GUI for ShadowTun Linux VPN.
+Cyber-Obsidian Desktop GUI for AuraLink Linux VPN.
 Built with PyQt5, featuring a glowing circular connect button,
 live download/upload speedometers, quick node switcher, DNS selector,
 real-time log stream, and complete server management.
@@ -45,7 +45,7 @@ from gui.theme import QSS_STYLE, PALETTE
 
 def sigint_handler(signum, frame):
     """Handles Ctrl+C (SIGINT) cleanly from terminal."""
-    print("\n[ShadowTun] Terminating upon Ctrl+C...")
+    print("\n[AuraLink] Terminating upon Ctrl+C...")
     app_inst = QApplication.instance()
     if app_inst and hasattr(app_inst, "_main_win"):
         win = app_inst._main_win
@@ -687,10 +687,12 @@ def get_app_icon() -> QIcon:
     possible_paths = [
         os.path.join(BASE_DIR, "gui", "assets", "icon.png"),
         os.path.join(BASE_DIR, "gui", "assets", "icon.svg"),
+        "/opt/auralink/gui/assets/icon.png",
+        "/opt/auralink/gui/assets/icon.svg",
+        "/usr/share/icons/hicolor/256x256/apps/auralink.png",
+        "/usr/share/icons/hicolor/scalable/apps/auralink.svg",
         "/opt/shadowtun/gui/assets/icon.png",
-        "/opt/shadowtun/gui/assets/icon.svg",
-        "/usr/share/icons/hicolor/256x256/apps/shadowtun.png",
-        "/usr/share/icons/hicolor/scalable/apps/shadowtun.svg"
+        "/usr/share/icons/hicolor/256x256/apps/shadowtun.png"
     ]
     for p in possible_paths:
         if os.path.exists(p):
@@ -740,7 +742,7 @@ class MainWindow(QMainWindow):
         self.signals.state_changed.emit(event_type, data)
 
     def init_ui(self):
-        self.setWindowTitle("ShadowTun GUI")
+        self.setWindowTitle("AuraLink GUI")
         self.setWindowIcon(get_app_icon())
         self.resize(780, 520)
         self.setMinimumSize(700, 480)
@@ -769,7 +771,7 @@ class MainWindow(QMainWindow):
             dots_layout.addWidget(dot)
         header.addLayout(dots_layout)
 
-        lbl_app_name = QLabel("ShadowTun GUI")
+        lbl_app_name = QLabel("AuraLink GUI")
         lbl_app_name.setStyleSheet("font-size: 13px; font-weight: 800; color: #FFFFFF; font-family: monospace; margin-left: 6px;")
         header.addWidget(lbl_app_name)
 
@@ -1286,7 +1288,7 @@ class MainWindow(QMainWindow):
         self.tray_icon.activated.connect(self.on_tray_activated)
         
         tray_menu = QMenu()
-        act_show = QAction("Show ShadowTun", self)
+        act_show = QAction("Show AuraLink", self)
         act_show.triggered.connect(self.show_window)
         tray_menu.addAction(act_show)
 
@@ -1318,7 +1320,7 @@ class MainWindow(QMainWindow):
         self.showMinimized()
         self.hide()
         if hasattr(self, 'tray_icon') and self.tray_icon.isVisible():
-            self.tray_icon.showMessage("ShadowTun GUI", "Minimized to system tray. Click tray icon to restore.", QSystemTrayIcon.Information, 1500)
+            self.tray_icon.showMessage("AuraLink GUI", "Minimized to system tray. Click tray icon to restore.", QSystemTrayIcon.Information, 1500)
 
     def toggle_maximize(self):
         if self.isMaximized():
@@ -1344,7 +1346,7 @@ def launch_gui():
     app = QApplication.instance()
     if not app:
         app = QApplication(sys.argv)
-    app.setApplicationName("ShadowTun")
+    app.setApplicationName("AuraLink")
     app.setWindowIcon(get_app_icon())
 
     win = MainWindow()

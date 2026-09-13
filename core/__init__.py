@@ -1,5 +1,5 @@
 """
-ShadowTun Linux VPN Core Package
+AuraLink Linux VPN Core Package
 """
 from .config_manager import ConfigManager, ConfigError
 from .network_manager import NetworkManager, NetworkError

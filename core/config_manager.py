@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Config Manager for ShadowTun Linux VPN.
+Config Manager for AuraLink Linux VPN.
 Handles parsing ssconf://, ss://, JSON configs, fetching remote subscription configs,
 injecting local_address/local_port, and persistent profile management.
 """
@@ -13,9 +13,19 @@ import base64
 import urllib.request
 import urllib.parse
 import ssl
+import shutil
 from typing import Dict, List, Optional, Tuple, Any
 
-CONFIG_DIR = os.path.expanduser("~/.config/shadowtun")
+LEGACY_CONFIG_DIR = os.path.expanduser("~/.config/shadowtun")
+CONFIG_DIR = os.path.expanduser("~/.config/auralink")
+
+# Auto-migrate legacy configuration if present
+if os.path.exists(LEGACY_CONFIG_DIR) and not os.path.exists(CONFIG_DIR):
+    try:
+        shutil.copytree(LEGACY_CONFIG_DIR, CONFIG_DIR)
+    except Exception:
+        pass
+
 PROFILES_FILE = os.path.join(CONFIG_DIR, "profiles.json")
 ACTIVE_CONFIG_FILE = os.path.join(CONFIG_DIR, "active_config.json")
 SETTINGS_FILE = os.path.join(CONFIG_DIR, "settings.json")
@@ -162,7 +172,7 @@ class ConfigManager:
     def fetch_url_json(self, url: str) -> Dict[str, Any]:
         """Fetch remote JSON config with proper user-agent and SSL fallback."""
         headers = {
-            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) ShadowTun/1.0",
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AuraLink/1.0",
             "Accept": "application/json, text/plain, */*"
         }
         req = urllib.request.Request(url, headers=headers)
@@ -239,7 +249,7 @@ class ConfigManager:
                 profile_name = urllib.parse.unquote(tag)
             else:
                 target_url = url_part
-                profile_name = "ShadowTun Server"
+                profile_name = "AuraLink Server"
 
             # Prepend https:// if not present
             if not target_url.startswith("http://") and not target_url.startswith("https://"):

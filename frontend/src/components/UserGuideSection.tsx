@@ -98,7 +98,7 @@ export default function UserGuideSection() {
             <span>Complete Documentation</span>
           </div>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white tracking-tight">
-            ShadowTun User Guide & Manual
+            AuraLink User Guide & Manual
           </h2>
           <p className="mt-3 text-slate-300 text-sm sm:text-base">
             Master both the modern PyQt5 desktop GUI and headless CLI scripting workflows.
@@ -148,9 +148,9 @@ export default function UserGuideSection() {
                 className="space-y-8"
               >
                 <div>
-                  <h3 className="text-2xl font-bold text-white mb-2">Getting Started with ShadowTun</h3>
+                  <h3 className="text-2xl font-bold text-white mb-2">Getting Started with AuraLink</h3>
                   <p className="text-slate-300 text-sm">
-                    Follow this 3-step guide to get ShadowTun running on your Linux desktop or server.
+                    Follow this 3-step guide to get AuraLink running on your Linux desktop or server.
                   </p>
                 </div>
 
@@ -161,7 +161,7 @@ export default function UserGuideSection() {
                       <div className="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-300 font-mono font-bold flex items-center justify-center text-sm mb-4 border border-cyan-500/30">
                         01
                       </div>
-                      <h4 className="text-base font-bold text-white mb-2">Install ShadowTun</h4>
+                      <h4 className="text-base font-bold text-white mb-2">Install AuraLink</h4>
                       <p className="text-xs text-slate-400 leading-relaxed mb-4">
                         Run the 1-command universal installer which configures dependencies, desktop shortcuts, and sudoers rules.
                       </p>
@@ -183,7 +183,7 @@ export default function UserGuideSection() {
                       </p>
                     </div>
                     <div className="p-3 rounded-xl bg-black font-mono text-[11px] text-purple-300 overflow-x-auto border border-white/[0.04]">
-                      <code>shadowtun import &quot;ssconf://...&quot;</code>
+                      <code>auralink import &quot;ssconf://...&quot;</code>
                     </div>
                   </div>
 
@@ -195,11 +195,11 @@ export default function UserGuideSection() {
                       </div>
                       <h4 className="text-base font-bold text-white mb-2">Connect & Switch</h4>
                       <p className="text-xs text-slate-400 leading-relaxed mb-4">
-                        Connect via CLI/GUI or switch active servers seamlessly by Profile ID with <code className="text-cyan-300 font-mono">shadowtun switch &lt;ID&gt;</code>.
+                        Connect via CLI/GUI or switch active servers seamlessly by Profile ID with <code className="text-cyan-300 font-mono">auralink switch &lt;ID&gt;</code>.
                       </p>
                     </div>
                     <div className="p-3 rounded-xl bg-black font-mono text-[11px] text-emerald-300 overflow-x-auto border border-white/[0.04]">
-                      <code>shadowtun switch a1b2c3d4</code>
+                      <code>auralink switch a1b2c3d4</code>
                     </div>
                   </div>
                 </div>
@@ -232,7 +232,7 @@ export default function UserGuideSection() {
                 <div>
                   <h3 className="text-2xl font-bold text-white mb-2">PyQt5 Dark Mode Desktop GUI</h3>
                   <p className="text-slate-300 text-sm">
-                    ShadowTun features a sleek, hardware-accelerated desktop interface built for Linux desktops (GNOME, KDE Plasma, XFCE, Sway, Hyprland).
+                    AuraLink features a sleek, hardware-accelerated desktop interface built for Linux desktops (GNOME, KDE Plasma, XFCE, Sway, Hyprland).
                   </p>
                 </div>
 
@@ -305,7 +305,7 @@ export default function UserGuideSection() {
                 <div className="p-4 rounded-2xl bg-cyan-950/20 border border-cyan-500/20 text-xs text-slate-300 flex items-center justify-between">
                   <span>To launch the desktop GUI from your terminal, simply execute:</span>
                   <code className="font-mono text-cyan-300 bg-black/60 px-3 py-1.5 rounded-lg border border-cyan-500/30">
-                    shadowtun gui
+                    auralink gui
                   </code>
                 </div>
               </motion.div>
@@ -438,7 +438,7 @@ export default function UserGuideSection() {
                 <div>
                   <h3 className="text-2xl font-bold text-white mb-2">ssconf:// Protocol Specification</h3>
                   <p className="text-slate-300 text-sm">
-                    How ShadowTun decodes, decrypts, and maps dynamic subscription endpoints.
+                    How AuraLink decodes, decrypts, and maps dynamic subscription endpoints.
                   </p>
                 </div>
 
@@ -450,7 +450,7 @@ export default function UserGuideSection() {
                   <div className="p-5 rounded-2xl bg-black/40 border border-white/[0.06] space-y-3">
                     <h4 className="text-sm font-bold text-white">1. URL Fetch & Verification</h4>
                     <p className="text-xs text-slate-400 leading-relaxed">
-                      ShadowTun strips the <code className="text-cyan-300 font-mono">ssconf://</code> scheme to <code className="text-cyan-300 font-mono">https://</code>, requests the subscription payload over TLS, and checks HTTP response headers for account quota warnings or server package expirations.
+                      AuraLink strips the <code className="text-cyan-300 font-mono">ssconf://</code> scheme to <code className="text-cyan-300 font-mono">https://</code>, requests the subscription payload over TLS, and checks HTTP response headers for account quota warnings or server package expirations.
                     </p>
                   </div>
 
@@ -464,14 +464,14 @@ export default function UserGuideSection() {
                   <div className="p-5 rounded-2xl bg-black/40 border border-white/[0.06] space-y-3">
                     <h4 className="text-sm font-bold text-white">3. Local Port & Profile Binding</h4>
                     <p className="text-xs text-slate-400 leading-relaxed">
-                      Injects local SOCKS5 listening address (<code className="text-cyan-300 font-mono">127.0.0.1:1080</code>) and saves the active node profile to <code className="text-slate-300 font-mono">~/.config/shadowtun/profiles.json</code>.
+                      Injects local SOCKS5 listening address (<code className="text-cyan-300 font-mono">127.0.0.1:1080</code>) and saves the active node profile to <code className="text-slate-300 font-mono">~/.config/auralink/profiles.json</code>.
                     </p>
                   </div>
 
                   <div className="p-5 rounded-2xl bg-black/40 border border-white/[0.06] space-y-3">
                     <h4 className="text-sm font-bold text-white">4. Packet Prefix & TLS Disguise</h4>
                     <p className="text-xs text-slate-400 leading-relaxed">
-                      If the subscription defines a prefix header (e.g. <code className="text-emerald-300 font-mono">\x16\x03\x01</code> for TLS Client Hello), ShadowTun injects it into <code className="text-slate-300 font-mono">sslocal</code> to disguise proxy packets as standard HTTPS traffic.
+                      If the subscription defines a prefix header (e.g. <code className="text-emerald-300 font-mono">\x16\x03\x01</code> for TLS Client Hello), AuraLink injects it into <code className="text-slate-300 font-mono">sslocal</code> to disguise proxy packets as standard HTTPS traffic.
                     </p>
                   </div>
                 </div>

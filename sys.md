@@ -1,12 +1,12 @@
-# ShadowTun Linux VPN — System & Technology Architecture (`sys.md`)
+# AuraLink Linux VPN — System & Technology Architecture (`sys.md`)
 
-This document provides a comprehensive technical overview of the technologies, libraries, protocols, kernel subsystems, and architectural design patterns implemented across the **ShadowTun Linux VPN** project.
+This document provides a comprehensive technical overview of the technologies, libraries, protocols, kernel subsystems, and architectural design patterns implemented across the **AuraLink Linux VPN** project.
 
 ---
 
 ## 1. High-Level System Architecture
 
-ShadowTun transforms user-space SOCKS5 proxies (Shadowsocks) into a full-system TUN network device, capturing all operating system TCP/UDP traffic and DNS queries.
+AuraLink transforms user-space SOCKS5 proxies (Shadowsocks) into a full-system TUN network device, capturing all operating system TCP/UDP traffic and DNS queries.
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -45,9 +45,9 @@ ShadowTun transforms user-space SOCKS5 proxies (Shadowsocks) into a full-system 
 └───────────────────────────────────┬────────────────────────────────────┘
                                     │ (Internet / WAN)
                                     ▼
-                     ┌─────────────────────────────┐
-                     │  Remote Shadowsocks Server  │
-                     └─────────────────────────────┘
+                      ┌─────────────────────────────┐
+                      │  Remote Shadowsocks Server  │
+                      └─────────────────────────────┘
 ```
 
 ---
@@ -103,7 +103,7 @@ ShadowTun transforms user-space SOCKS5 proxies (Shadowsocks) into a full-system 
 
 ### 2.5 Security, Privilege Model & Elevation
 
-- **Granular Sudoers Rule (`/etc/sudoers.d/shadowtun`)**:
+- **Granular Sudoers Rule (`/etc/sudoers.d/auralink`)**:
   - Automatically installed during initial setup (`install.sh`).
   - Configures `NOPASSWD` elevation exclusively for required network and daemon binaries (`vpn-core-helper`, `tun2socks`, `ip`, `resolvectl`, `pkill`, `kill`).
   - Guarantees seamless one-click connect/disconnect in GUI/CLI without prompting for sudo passwords repeatedly.
@@ -130,7 +130,7 @@ ShadowTun transforms user-space SOCKS5 proxies (Shadowsocks) into a full-system 
   - Real-time polling timer (`QTimer`) for live upload/download speed counters and debug log streaming.
 - **Desktop Environment Integration**:
   - `QSystemTrayIcon` with context menu for minimize-to-tray and background operation.
-  - Freedesktop `.desktop` standard compliant (`/usr/share/applications/shadowtun.desktop`).
+  - Freedesktop `.desktop` standard compliant (`/usr/share/applications/auralink.desktop`).
   - Hicolor icon theme compliant scalable SVG and PNG assets (`/usr/share/icons/hicolor/...`).
 
 ---
@@ -138,7 +138,7 @@ ShadowTun transforms user-space SOCKS5 proxies (Shadowsocks) into a full-system 
 ### 2.7 CLI & Automation Stack
 
 - **`argparse` Subcommand Architecture**:
-  - Commands: `connect`, `disconnect`, `status`, `import`, `list`, `delete`, `test`, `logs`, `gui`.
+  - Commands: `connect`, `switch`, `disconnect`, `status`, `import`, `list`, `delete`, `test`, `logs`, `gui`.
 - **Interactive ANSI Stream**:
   - Terminal coloring and formatting with live in-place carriage-return update stream (`connect -m`).
 - **Automation / Headless Support**:
@@ -174,8 +174,9 @@ ShadowTun transforms user-space SOCKS5 proxies (Shadowsocks) into a full-system 
 ```
 Arch_VPN/
 ├── bin/
-│   ├── shadowtun             # Main unified CLI / GUI executable launcher
-│   ├── shadowtun-vpn         # Symbolic link alias
+│   ├── auralink              # Main unified CLI / GUI executable launcher
+│   ├── auralink-vpn          # Symbolic link alias
+│   ├── shadowtun             # Compatibility symlink alias
 │   └── vpn-core-helper       # Privileged network and interface helper script
 ├── cli/
 │   ├── __init__.py           # CLI package definition
@@ -190,13 +191,13 @@ Arch_VPN/
 ├── gui/
 │   ├── __init__.py           # GUI package definition
 │   ├── app.py                # PyQt5 GUI desktop application
-│   ├── assets/               # SVG & PNG application icons
+│   ├── assets/               # SVG & PNG application icons (AuraLink Mascot)
 │   └── theme.py              # Dark QSS styles, palette tokens & typography
 ├── packaging/
 │   ├── PKGBUILD              # Arch Linux package build recipe
 │   ├── build-deb.sh          # Debian (.deb) package generator
 │   ├── build-rpm.sh          # Fedora / RHEL (.rpm) package generator
-│   └── shadowtun.desktop     # XDG Desktop application launcher
+│   └── auralink.desktop      # XDG Desktop application launcher
 ├── install.sh                # Universal 1-command installer script
 ├── uninstall.sh              # Clean uninstaller script
 ├── tun2-stock.sh             # Standalone monolithic shell script engine

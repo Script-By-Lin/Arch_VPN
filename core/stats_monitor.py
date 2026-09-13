@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Stats Monitor for ShadowTun Linux VPN.
+Stats Monitor for AuraLink Linux VPN.
 Monitors interface traffic, live upload/download speed, connection duration,
 and server ping / latency.
 """

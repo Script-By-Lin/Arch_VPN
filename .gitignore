@@ -33,3 +33,9 @@ lerna-debug.log*
 .idea/
 .vscode/
 *.tsbuildinfo
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+

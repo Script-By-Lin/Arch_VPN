@@ -6,5 +6,5 @@ Icon=auralink
 Terminal=false
 Type=Application
 Categories=Network;VPN;Security;
-Keywords=vpn;shadowsocks;tun2socks;proxy;security;auralink;shadowtun;
+Keywords=vpn;shadowsocks;tun2socks;proxy;security;auralink;
 StartupNotify=true

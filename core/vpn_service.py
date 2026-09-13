@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-VPN Service Orchestrator for ShadowTun Linux VPN.
+VPN Service Orchestrator for AuraLink Linux VPN.
 Coordinates ConfigManager, ProcessManager, NetworkManager, and StatsMonitor.
 Provides thread-safe state management, events, and automatic rollback on failure.
 """
@@ -24,7 +24,7 @@ STATE_CONNECTED = "CONNECTED"
 STATE_DISCONNECTING = "DISCONNECTING"
 STATE_ERROR = "ERROR"
 
-SESSION_FILE = os.path.expanduser("~/.config/shadowtun/state/session.json")
+SESSION_FILE = os.path.expanduser("~/.config/auralink/state/session.json")
 
 
 class VPNService:

@@ -1,8 +1,8 @@
-# PassThru VPN (ShadowTun Linux)
+# AuraLink VPN (AuraLink Linux)
 
 > **Universal Shadowsocks & tun2socks VPN Client for Linux (Arch, Debian, Ubuntu, Fedora, RPM, openSUSE)**
 
-PassThru VPN is a high-performance, full-system VPN client designed specifically for Linux. It turns Shadowsocks proxy subscriptions into a complete TUN-based virtual private network, routing all TCP/UDP traffic and DNS queries securely while bypassing deep packet inspection (DPI).
+AuraLink VPN is a high-performance, full-system VPN client designed specifically for Linux. It turns Shadowsocks proxy subscriptions into a complete TUN-based virtual private network, routing all TCP/UDP traffic and DNS queries securely while bypassing deep packet inspection (DPI).
 
 ---
 
@@ -12,7 +12,7 @@ PassThru VPN is a high-performance, full-system VPN client designed specifically
 - **Cross-Distribution Support**: Runs natively on **Arch Linux / Manjaro / CachyOS**, **Debian / Ubuntu / Mint**, **Fedora / RHEL / CentOS**, and **openSUSE**.
 - **Full Tunnel Routing (`tun2socks`)**: Routes all system traffic through a `tun0` virtual network adapter with automatic default gateway preservation.
 - **Anti-Censorship & Prefix Support**: Full support for Shadowsocks-rust packet prefixes (TLS disguise), AEAD ciphers (`chacha20-ietf-poly1305`, `aes-256-gcm`), and UDP relay.
-- **One-Time Password Setup**: Automatically configures a privileged helper rule in `/etc/sudoers.d/passthru-vpn` so you never have to type your sudo password every time you connect.
+- **One-Time Password Setup**: Automatically configures a privileged helper rule in `/etc/sudoers.d/auralink` so you never have to type your sudo password every time you connect.
 - **Modern Dark-Mode GUI (PyQt5)**:
   - Glowing circular animated connect button
   - Live upload/download speed counters & session data meter
@@ -53,8 +53,8 @@ sudo ./install.sh
 ### 1. Launching Desktop GUI
 
 ```bash
-passthru-vpn gui
-# or launch "PassThru VPN" from your Application Menu / App Launcher
+auralink gui
+# or launch "AuraLink VPN" from your Application Menu / App Launcher
 ```
 
 ### 2. Command-Line Interface (CLI)
@@ -62,59 +62,59 @@ passthru-vpn gui
 #### Import a Subscription Key
 
 ```bash
-passthru-vpn import "ssconf://....#....#1"
+auralink import "ssconf://....#....#1"
 ```
 
 #### Connect / Switch VPN Server
 
 ```bash
 # Connect to the selected/active profile
-shadowtun connect
+auralink connect
 
 # Switch / connect directly by Profile ID (full ID or prefix)
-shadowtun connect a1b2c3d4
-shadowtun switch a1b2c3d4
+auralink connect a1b2c3d4
+auralink switch a1b2c3d4
 
 # Switch by Profile Name
-shadowtun switch "Tokyo-Fast-01"
+auralink switch "Tokyo-Fast-01"
 
 # Connect directly with a key URL
-shadowtun connect "ssconf://...."
+auralink connect "ssconf://...."
 
 # Connect and stream live traffic statistics
-shadowtun connect -m
+auralink connect -m
 ```
 
 #### Check Status
 
 ```bash
-passthru-vpn status
+auralink status
 ```
 
 #### List & Test Profiles
 
 ```bash
-passthru-vpn list
-passthru-vpn test
+auralink list
+auralink test
 ```
 
 #### Disconnect
 
 ```bash
-passthru-vpn disconnect
+auralink disconnect
 ```
 
 #### View Real-Time Logs
 
 ```bash
 # View recent logs (default 40 lines)
-shadowtun logs
+auralink logs
 
 # Follow log output in real-time
-shadowtun logs -f
+auralink logs -f
 
 # Follow log output with customized initial line count
-shadowtun logs -f -n 100
+auralink logs -f -n 100
 ```
 
 ---

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Network Manager for ShadowTun Linux VPN.
+Network Manager for AuraLink Linux VPN.
 Handles interface detection, gateway resolution, static route pinning,
 TUN interface creation, DNS configuration (systemd-resolved & resolv.conf),
 IPv6 leak protection, and atomic network teardown.

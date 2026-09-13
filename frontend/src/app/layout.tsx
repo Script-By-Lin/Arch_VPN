@@ -13,16 +13,16 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ShadowTun — Universal Shadowsocks & tun2socks VPN Client for Linux",
+  title: "AuraLink — Universal Shadowsocks & tun2socks VPN Client for Linux",
   description: "Next-generation high-performance VPN client for Arch Linux, Debian, Ubuntu, Fedora, and openSUSE. Full TUN kernel routing, anti-censorship prefixes, and zero-leak DNS.",
-  keywords: ["ShadowTun", "Shadowsocks", "tun2socks", "Linux VPN", "Arch Linux", "CachyOS", "Debian", "Ubuntu", "Fedora", "DPI Bypass", "Anti-Censorship", "ssconf"],
+  keywords: ["AuraLink", "Shadowsocks", "tun2socks", "Linux VPN", "Arch Linux", "CachyOS", "Debian", "Ubuntu", "Fedora", "DPI Bypass", "Anti-Censorship", "ssconf"],
   authors: [{ name: "Script-By-Lin" }],
   icons: {
-    icon: "/icon.svg",
+    icon: "/icon.png",
     apple: "/icon.png",
   },
   openGraph: {
-    title: "ShadowTun — Universal Shadowsocks & tun2socks VPN Client for Linux",
+    title: "AuraLink — Universal Shadowsocks & tun2socks VPN Client for Linux",
     description: "High-performance TUN-based VPN client with anti-censorship TLS prefixes and zero-leak DNS for all Linux distributions.",
     type: "website",
   },

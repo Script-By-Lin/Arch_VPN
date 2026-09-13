@@ -1,2 +1,2 @@
-"""ShadowTun VPN CLI Package"""
+"""AuraLink VPN CLI Package"""
 from .main import main

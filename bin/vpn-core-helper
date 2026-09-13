@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-# ShadowTun Linux VPN Privileged Helper
+# AuraLink Linux VPN Privileged Helper
 # Executes network routing, TUN interface management, and DNS configuration.
 # Designed to be invoked via sudo or polkit.
 # ==============================================================================

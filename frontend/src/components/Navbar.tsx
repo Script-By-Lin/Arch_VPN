@@ -37,19 +37,19 @@ export default function Navbar() {
       <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
         {/* Logo & Brand */}
         <a href="#" className="flex items-center gap-3 group">
-          <div className="relative w-9 h-9 rounded-xl overflow-hidden p-1.5 bg-gradient-to-br from-cyan-500/20 to-purple-600/20 border border-cyan-500/30 group-hover:border-cyan-400/60 transition-colors">
+          <div className="relative w-9 h-9 rounded-xl overflow-hidden p-0.5 bg-gradient-to-br from-cyan-500/30 to-purple-600/30 border border-cyan-500/40 group-hover:border-cyan-400/80 transition-colors shadow-lg shadow-cyan-500/20">
             <Image
-              src="/icon.svg"
-              alt="ShadowTun Logo"
-              width={32}
-              height={32}
-              className="w-full h-full object-contain"
+              src="/icon.png"
+              alt="AuraLink Logo"
+              width={36}
+              height={36}
+              className="w-full h-full object-cover rounded-lg"
             />
             <div className="absolute inset-0 bg-cyan-400/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
           </div>
           <div className="flex items-center gap-2">
-            <span className="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-300 bg-clip-text text-transparent">
-              ShadowTun
+            <span className="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-cyan-100 to-slate-200 bg-clip-text text-transparent">
+              AuraLink
             </span>
             <span className="text-[11px] font-mono font-medium px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
               v1.0.0

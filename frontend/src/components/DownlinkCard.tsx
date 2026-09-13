@@ -29,7 +29,7 @@ export default function DownlinkCard() {
           {/* Header Title & Version Pill */}
           <div className="flex items-center gap-3">
             <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white font-sans">
-              ShadowTun CLI
+              AuraLink CLI & Desktop
             </h2>
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#1a2b4c] text-[#60a5fa] border border-[#2563eb]/30">
               v1.0.0
@@ -38,7 +38,7 @@ export default function DownlinkCard() {
 
           {/* Subtitle / Description */}
           <p className="text-slate-300 text-base sm:text-lg leading-relaxed max-w-3xl">
-            Work with ShadowTun directly in your codebase or desktop. Build, debug, and route all Linux traffic securely from your terminal. Full TUN encapsulation, automatic subscription decoding, and zero-leak DNS.
+            Work with AuraLink directly in your terminal or desktop. Build, debug, and route all Linux traffic securely with high throughput. Full TUN encapsulation, automatic subscription decoding, and zero-leak DNS.
           </p>
 
           {/* Platform Sections Stacked Directly (No surrounding card) */}
@@ -106,7 +106,7 @@ export default function DownlinkCard() {
           <div className="pt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs text-slate-400">
             <div className="flex items-center gap-2">
               <ShieldCheck className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-              <span>Helper rule configured in <code className="text-slate-300 font-mono">/etc/sudoers.d/shadowtun</code> for passwordless operation</span>
+              <span>Helper rule configured in <code className="text-slate-300 font-mono">/etc/sudoers.d/auralink</code> for passwordless operation</span>
             </div>
 
           </div>

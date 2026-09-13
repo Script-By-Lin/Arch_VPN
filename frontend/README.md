@@ -1,6 +1,6 @@
-# ShadowTun Linux — Frontend & Documentation Web App
+# AuraLink Linux — Frontend & Documentation Web App
 
-A modern, high-performance web application and interactive documentation portal for **ShadowTun Linux**, built with **Next.js 16 (App Router)**, **Framer Motion**, **Lucide Icons**, and **Tailwind CSS v4**.
+A modern, high-performance web application and interactive documentation portal for **AuraLink Linux**, built with **Next.js 16 (App Router)**, **Framer Motion**, **Lucide Icons**, and **Tailwind CSS v4**.
 
 ---
 
@@ -62,7 +62,7 @@ A root `vercel.json` and `.vercelignore` are included. Running `vercel` or impor
    - Shell code block with interactive copy-to-clipboard button and animated checkmark feedback.
    - Quick access to download `install.sh`, `uninstall.sh`, and `tun2-stock.sh`.
 
-2. **About ShadowTun Section**:
+2. **About AuraLink Section**:
    - Deep-dive into core capabilities: `ssconf://` parser, full-system TUN interface (`tun0`), `shadowsocks-rust` AEAD ciphers, TLS disguise prefixes defeating Deep Packet Inspection (DPI), zero-leak DNS sinkhole, and non-root passwordless automation.
 
 3. **Linux Kernel Architecture Visualizer**:

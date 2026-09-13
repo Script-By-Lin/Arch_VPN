@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# ShadowTun VPN - Universal Linux Installer
+# AuraLink VPN - Universal Linux Installer
 # Supports: Arch Linux, Manjaro, CachyOS, Debian, Ubuntu, Linux Mint,
 #           Fedora, RHEL, openSUSE, Alpine, etc.
 # Configures dependencies, static binary fallbacks, desktop launcher,
@@ -20,7 +20,7 @@ RESET="\033[0m"
 
 echo -e "${CYAN}${BOLD}"
 echo "╔═══════════════════════════════════════════════════════════╗"
-echo "║          ShadowTun VPN - Universal Linux Installer        ║"
+echo "║          AuraLink VPN - Universal Linux Installer         ║"
 echo "╚═══════════════════════════════════════════════════════════╝"
 echo -e "${RESET}"
 
@@ -37,10 +37,10 @@ if [[ $EUID -ne 0 ]]; then
   fi
 fi
 
-TARGET_DIR="/opt/shadowtun"
-BIN_LINK="/usr/local/bin/shadowtun"
+TARGET_DIR="/opt/auralink"
+BIN_LINK="/usr/local/bin/auralink"
 HELPER_LINK="/usr/local/bin/vpn-core-helper"
-SUDOERS_FILE="/etc/sudoers.d/shadowtun"
+SUDOERS_FILE="/etc/sudoers.d/auralink"
 CLEANUP_TMP=false
 TMP_DIR=""
 SRC_DIR=""
@@ -55,7 +55,7 @@ if [[ -f "$SCRIPT_SOURCE" ]]; then
 fi
 
 if [[ -z "$SRC_DIR" ]]; then
-  echo -e "${CYAN}[*] Downloading latest ShadowTun release from GitHub...${RESET}"
+  echo -e "${CYAN}[*] Downloading latest AuraLink release from GitHub...${RESET}"
   TMP_DIR="$(mktemp -d)"
   CLEANUP_TMP=true
   ARCHIVE_URL="https://github.com/Script-By-Lin/Arch_VPN/archive/refs/heads/main.tar.gz"
@@ -178,7 +178,7 @@ else
   echo -e "${GREEN}[✓] tun2socks is available at $(command -v tun2socks)${RESET}"
 fi
 
-# 3. Deploy Application Files to /opt/shadowtun
+# 3. Deploy Application Files to /opt/auralink
 echo -e "${CYAN}[3/6] Deploying application files to $TARGET_DIR...${RESET}"
 mkdir -p "$TARGET_DIR"
 cp -r "$SRC_DIR/core" "$TARGET_DIR/"
@@ -190,15 +190,23 @@ if [[ -f "$SRC_DIR/uninstall.sh" ]]; then
   chmod +x "$TARGET_DIR/uninstall.sh"
 fi
 
-chmod +x "$TARGET_DIR/bin/shadowtun"
+chmod +x "$TARGET_DIR/bin/auralink" 2>/dev/null || true
+if [[ -f "$TARGET_DIR/bin/shadowtun" ]]; then chmod +x "$TARGET_DIR/bin/shadowtun"; fi
 chmod +x "$TARGET_DIR/bin/vpn-core-helper"
 chmod +x "$TARGET_DIR/cli/main.py"
 chmod +x "$TARGET_DIR/gui/app.py"
 
 # Symlink CLI / GUI launcher and helper
-ln -sf "$TARGET_DIR/bin/shadowtun" "$BIN_LINK"
-ln -sf "$TARGET_DIR/bin/shadowtun" "/usr/local/bin/shadowtun-vpn"
+ln -sf "$TARGET_DIR/bin/auralink" "$BIN_LINK"
+ln -sf "$TARGET_DIR/bin/auralink" "/usr/local/bin/auralink-vpn"
+ln -sf "$TARGET_DIR/bin/auralink" "/usr/local/bin/shadowtun"
+ln -sf "$TARGET_DIR/bin/auralink" "/usr/local/bin/shadowtun-vpn"
 ln -sf "$TARGET_DIR/bin/vpn-core-helper" "$HELPER_LINK"
+
+# Also maintain legacy /opt/shadowtun link if needed
+if [[ ! -e "/opt/shadowtun" ]]; then
+  ln -sf "$TARGET_DIR" "/opt/shadowtun"
+fi
 
 # 4. Configure One-Time Sudoers Permissions (No more passwords on connect)
 echo -e "${CYAN}[4/6] Configuring one-time sudoers permissions...${RESET}"
@@ -236,7 +244,7 @@ SUDO_CMDS="$(printf ", %s" "${VALID_BINS[@]}")"
 SUDO_CMDS="${SUDO_CMDS:2}"
 
 cat <<EOF > "$SUDOERS_FILE"
-# ShadowTun VPN Privileged Helper Rule
+# AuraLink VPN Privileged Helper Rule
 # Allows non-root users to manage TUN device, routes, and VPN daemon seamlessly.
 ALL ALL=(ALL) NOPASSWD: $SUDO_CMDS
 EOF
@@ -253,10 +261,15 @@ mkdir -p /usr/share/applications
 mkdir -p /usr/share/icons/hicolor/scalable/apps
 mkdir -p /usr/share/icons/hicolor/256x256/apps
 
+cp "$SRC_DIR/gui/assets/icon.svg" /usr/share/icons/hicolor/scalable/apps/auralink.svg 2>/dev/null || true
+cp "$SRC_DIR/gui/assets/icon.png" /usr/share/icons/hicolor/256x256/apps/auralink.png 2>/dev/null || true
 cp "$SRC_DIR/gui/assets/icon.svg" /usr/share/icons/hicolor/scalable/apps/shadowtun.svg 2>/dev/null || true
 cp "$SRC_DIR/gui/assets/icon.png" /usr/share/icons/hicolor/256x256/apps/shadowtun.png 2>/dev/null || true
-if [[ -f "$SRC_DIR/packaging/shadowtun.desktop" ]]; then
-  cp "$SRC_DIR/packaging/shadowtun.desktop" /usr/share/applications/shadowtun.desktop
+
+if [[ -f "$SRC_DIR/packaging/auralink.desktop" ]]; then
+  cp "$SRC_DIR/packaging/auralink.desktop" /usr/share/applications/auralink.desktop
+elif [[ -f "$SRC_DIR/packaging/shadowtun.desktop" ]]; then
+  cp "$SRC_DIR/packaging/shadowtun.desktop" /usr/share/applications/auralink.desktop
 fi
 
 if command -v gtk-update-icon-cache >/dev/null 2>&1; then
@@ -272,12 +285,12 @@ fi
 echo -e "${CYAN}[6/6] Finalizing setup...${RESET}"
 echo ""
 echo -e "${GREEN}${BOLD}════════════════════════════════════════════════════════════${RESET}"
-echo -e "${GREEN}${BOLD}  ✓ ShadowTun VPN has been installed successfully!          ${RESET}"
+echo -e "${GREEN}${BOLD}  ✓ AuraLink VPN has been installed successfully!           ${RESET}"
 echo -e "${GREEN}${BOLD}════════════════════════════════════════════════════════════${RESET}"
 echo ""
-echo -e "You can now run ShadowTun VPN in either mode:"
-echo -e "  • ${CYAN}${BOLD}shadowtun gui${RESET}        Launch Modern Desktop GUI"
-echo -e "  • ${CYAN}${BOLD}shadowtun connect <key>${RESET} Direct connect via CLI"
-echo -e "  • ${CYAN}${BOLD}shadowtun import <key>${RESET}  Import ssconf:// key"
-echo -e "  • ${CYAN}${BOLD}shadowtun status${RESET}       View live connection status"
+echo -e "You can now run AuraLink VPN in either mode:"
+echo -e "  • ${CYAN}${BOLD}auralink gui${RESET}        Launch Modern Desktop GUI"
+echo -e "  • ${CYAN}${BOLD}auralink connect <key>${RESET} Direct connect via CLI"
+echo -e "  • ${CYAN}${BOLD}auralink import <key>${RESET}  Import ssconf:// key"
+echo -e "  • ${CYAN}${BOLD}auralink status${RESET}       View live connection status"
 echo ""

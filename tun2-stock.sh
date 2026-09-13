@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# ShadowTun Standalone Shell Engine
+# AuraLink Standalone Shell Engine
 # Supports direct ssconf:// URL parsing, automatic DNS resolution,
 # and robust TUN routing.
 # ==============================================================================
@@ -218,7 +218,7 @@ case "${1:-}" in
     ;;
   *)
     echo "Usage: $0 {start [key_url]|stop|restart [key_url]|status}"
-    echo "Example: $0 start 'ssconf://example.com/config.json#ShadowTun'"
+    echo "Example: $0 start 'ssconf://example.com/config.json#AuraLink'"
     exit 1
     ;;
 esac

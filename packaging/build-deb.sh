@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Debian / Ubuntu .deb Package Builder for ShadowTun VPN
+# Debian / Ubuntu .deb Package Builder for AuraLink VPN
 # ==============================================================================
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-PKG_NAME="shadowtun"
+PKG_NAME="auralink"
 VERSION="1.0.0"
 ARCH="amd64"
 BUILD_DIR="$ROOT_DIR/dist/deb-build/${PKG_NAME}_${VERSION}_${ARCH}"
 
 rm -rf "$ROOT_DIR/dist/deb-build"
 mkdir -p "$BUILD_DIR/DEBIAN"
-mkdir -p "$BUILD_DIR/opt/shadowtun"
+mkdir -p "$BUILD_DIR/opt/auralink"
 mkdir -p "$BUILD_DIR/usr/local/bin"
 mkdir -p "$BUILD_DIR/usr/share/applications"
 mkdir -p "$BUILD_DIR/usr/share/icons/hicolor/scalable/apps"
@@ -22,20 +22,21 @@ mkdir -p "$BUILD_DIR/usr/share/icons/hicolor/256x256/apps"
 mkdir -p "$BUILD_DIR/etc/sudoers.d"
 
 # Copy App Files
-cp -r "$ROOT_DIR/core" "$BUILD_DIR/opt/shadowtun/"
-cp -r "$ROOT_DIR/gui" "$BUILD_DIR/opt/shadowtun/"
-cp -r "$ROOT_DIR/cli" "$BUILD_DIR/opt/shadowtun/"
-cp -r "$ROOT_DIR/bin" "$BUILD_DIR/opt/shadowtun/"
+cp -r "$ROOT_DIR/core" "$BUILD_DIR/opt/auralink/"
+cp -r "$ROOT_DIR/gui" "$BUILD_DIR/opt/auralink/"
+cp -r "$ROOT_DIR/cli" "$BUILD_DIR/opt/auralink/"
+cp -r "$ROOT_DIR/bin" "$BUILD_DIR/opt/auralink/"
 
 # Symlinks
-ln -sf "/opt/shadowtun/bin/shadowtun" "$BUILD_DIR/usr/local/bin/shadowtun"
-ln -sf "/opt/shadowtun/bin/shadowtun" "$BUILD_DIR/usr/local/bin/shadowtun-vpn"
-ln -sf "/opt/shadowtun/bin/vpn-core-helper" "$BUILD_DIR/usr/local/bin/vpn-core-helper"
+ln -sf "/opt/auralink/bin/auralink" "$BUILD_DIR/usr/local/bin/auralink"
+ln -sf "/opt/auralink/bin/auralink" "$BUILD_DIR/usr/local/bin/auralink-vpn"
+ln -sf "/opt/auralink/bin/auralink" "$BUILD_DIR/usr/local/bin/shadowtun"
+ln -sf "/opt/auralink/bin/vpn-core-helper" "$BUILD_DIR/usr/local/bin/vpn-core-helper"
 
 # Desktop & Icons
-cp "$ROOT_DIR/packaging/shadowtun.desktop" "$BUILD_DIR/usr/share/applications/"
-cp "$ROOT_DIR/gui/assets/icon.svg" "$BUILD_DIR/usr/share/icons/hicolor/scalable/apps/shadowtun.svg"
-cp "$ROOT_DIR/gui/assets/icon.png" "$BUILD_DIR/usr/share/icons/hicolor/256x256/apps/shadowtun.png"
+cp "$ROOT_DIR/packaging/auralink.desktop" "$BUILD_DIR/usr/share/applications/"
+cp "$ROOT_DIR/gui/assets/icon.svg" "$BUILD_DIR/usr/share/icons/hicolor/scalable/apps/auralink.svg"
+cp "$ROOT_DIR/gui/assets/icon.png" "$BUILD_DIR/usr/share/icons/hicolor/256x256/apps/auralink.png"
 
 # Control file
 cat <<EOF > "$BUILD_DIR/DEBIAN/control"
@@ -45,9 +46,9 @@ Section: net
 Priority: optional
 Architecture: ${ARCH}
 Depends: python3, python3-pyqt5, iproute2, curl, jq
-Maintainer: ShadowTun Team <support@shadowtun.org>
+Maintainer: AuraLink Team <support@auralink.org>
 Description: Cross-Distro Shadowsocks & tun2socks VPN Client for Linux
- ShadowTun VPN provides high-speed full-system tunneling over Shadowsocks with
+ AuraLink VPN provides high-speed full-system tunneling over Shadowsocks with
  automatic ssconf:// key parsing, DNS leak protection, and a modern GUI/CLI.
 EOF
 
@@ -55,10 +56,10 @@ EOF
 cat <<'EOF' > "$BUILD_DIR/DEBIAN/postinst"
 #!/bin/sh
 set -e
-cat << 'SUDO_EOF' > /etc/sudoers.d/shadowtun
+cat << 'SUDO_EOF' > /etc/sudoers.d/auralink
 ALL ALL=(ALL) NOPASSWD: /usr/local/bin/vpn-core-helper, /usr/bin/tun2socks, /usr/local/bin/tun2socks, /usr/bin/ip, /usr/bin/resolvectl, /usr/bin/pkill, /usr/bin/kill
 SUDO_EOF
-chmod 0440 /etc/sudoers.d/shadowtun
+chmod 0440 /etc/sudoers.d/auralink
 exit 0
 EOF
 

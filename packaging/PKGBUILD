@@ -16,7 +16,6 @@ package() {
     install -d "$pkgdir/usr/local/bin"
     ln -sf "/opt/auralink/bin/auralink" "$pkgdir/usr/local/bin/auralink"
     ln -sf "/opt/auralink/bin/auralink" "$pkgdir/usr/local/bin/auralink-vpn"
-    ln -sf "/opt/auralink/bin/auralink" "$pkgdir/usr/local/bin/shadowtun"
     ln -sf "/opt/auralink/bin/vpn-core-helper" "$pkgdir/usr/local/bin/vpn-core-helper"
 
     install -Dm644 "$srcdir/packaging/auralink.desktop" "$pkgdir/usr/share/applications/auralink.desktop"

@@ -176,7 +176,6 @@ Arch_VPN/
 ├── bin/
 │   ├── auralink              # Main unified CLI / GUI executable launcher
 │   ├── auralink-vpn          # Symbolic link alias
-│   ├── shadowtun             # Compatibility symlink alias
 │   └── vpn-core-helper       # Privileged network and interface helper script
 ├── cli/
 │   ├── __init__.py           # CLI package definition

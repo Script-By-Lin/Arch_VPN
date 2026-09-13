@@ -191,7 +191,6 @@ if [[ -f "$SRC_DIR/uninstall.sh" ]]; then
 fi
 
 chmod +x "$TARGET_DIR/bin/auralink" 2>/dev/null || true
-if [[ -f "$TARGET_DIR/bin/shadowtun" ]]; then chmod +x "$TARGET_DIR/bin/shadowtun"; fi
 chmod +x "$TARGET_DIR/bin/vpn-core-helper"
 chmod +x "$TARGET_DIR/cli/main.py"
 chmod +x "$TARGET_DIR/gui/app.py"
@@ -199,14 +198,7 @@ chmod +x "$TARGET_DIR/gui/app.py"
 # Symlink CLI / GUI launcher and helper
 ln -sf "$TARGET_DIR/bin/auralink" "$BIN_LINK"
 ln -sf "$TARGET_DIR/bin/auralink" "/usr/local/bin/auralink-vpn"
-ln -sf "$TARGET_DIR/bin/auralink" "/usr/local/bin/shadowtun"
-ln -sf "$TARGET_DIR/bin/auralink" "/usr/local/bin/shadowtun-vpn"
 ln -sf "$TARGET_DIR/bin/vpn-core-helper" "$HELPER_LINK"
-
-# Also maintain legacy /opt/shadowtun link if needed
-if [[ ! -e "/opt/shadowtun" ]]; then
-  ln -sf "$TARGET_DIR" "/opt/shadowtun"
-fi
 
 # 4. Configure One-Time Sudoers Permissions (No more passwords on connect)
 echo -e "${CYAN}[4/6] Configuring one-time sudoers permissions...${RESET}"
@@ -272,8 +264,6 @@ done
 
 if [[ -f "$SRC_DIR/packaging/auralink.desktop" ]]; then
   cp "$SRC_DIR/packaging/auralink.desktop" /usr/share/applications/auralink.desktop
-elif [[ -f "$SRC_DIR/packaging/shadowtun.desktop" ]]; then
-  cp "$SRC_DIR/packaging/shadowtun.desktop" /usr/share/applications/auralink.desktop
 fi
 
 if command -v gtk-update-icon-cache >/dev/null 2>&1; then

@@ -30,7 +30,6 @@ cp -r "$ROOT_DIR/bin" "$BUILD_DIR/opt/auralink/"
 # Symlinks
 ln -sf "/opt/auralink/bin/auralink" "$BUILD_DIR/usr/local/bin/auralink"
 ln -sf "/opt/auralink/bin/auralink" "$BUILD_DIR/usr/local/bin/auralink-vpn"
-ln -sf "/opt/auralink/bin/auralink" "$BUILD_DIR/usr/local/bin/shadowtun"
 ln -sf "/opt/auralink/bin/vpn-core-helper" "$BUILD_DIR/usr/local/bin/vpn-core-helper"
 
 # Desktop & Icons

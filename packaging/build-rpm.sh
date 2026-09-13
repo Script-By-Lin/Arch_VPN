@@ -41,7 +41,6 @@ cp -r ${ROOT_DIR}/bin %{buildroot}/opt/auralink/
 
 ln -sf /opt/auralink/bin/auralink %{buildroot}/usr/local/bin/auralink
 ln -sf /opt/auralink/bin/auralink %{buildroot}/usr/local/bin/auralink-vpn
-ln -sf /opt/auralink/bin/auralink %{buildroot}/usr/local/bin/shadowtun
 ln -sf /opt/auralink/bin/vpn-core-helper %{buildroot}/usr/local/bin/vpn-core-helper
 
 cp ${ROOT_DIR}/packaging/auralink.desktop %{buildroot}/usr/share/applications/
@@ -58,7 +57,6 @@ chmod 0440 /etc/sudoers.d/auralink
 /opt/auralink
 /usr/local/bin/auralink
 /usr/local/bin/auralink-vpn
-/usr/local/bin/shadowtun
 /usr/local/bin/vpn-core-helper
 /usr/share/applications/auralink.desktop
 /usr/share/icons/hicolor/scalable/apps/auralink.svg

@@ -687,12 +687,14 @@ def get_app_icon() -> QIcon:
     possible_paths = [
         os.path.join(BASE_DIR, "gui", "assets", "icon.png"),
         os.path.join(BASE_DIR, "gui", "assets", "icon.svg"),
+        os.path.expanduser("~/.local/share/icons/hicolor/256x256/apps/auralink.png"),
+        os.path.expanduser("~/.local/share/icons/auralink.png"),
+        os.path.expanduser("~/.local/share/pixmaps/auralink.png"),
         "/opt/auralink/gui/assets/icon.png",
         "/opt/auralink/gui/assets/icon.svg",
+        "/usr/share/pixmaps/auralink.png",
         "/usr/share/icons/hicolor/256x256/apps/auralink.png",
-        "/usr/share/icons/hicolor/scalable/apps/auralink.svg",
-        "/opt/shadowtun/gui/assets/icon.png",
-        "/usr/share/icons/hicolor/256x256/apps/shadowtun.png"
+        "/usr/share/icons/hicolor/scalable/apps/auralink.svg"
     ]
     for p in possible_paths:
         if os.path.exists(p):

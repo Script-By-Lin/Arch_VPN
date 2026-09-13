@@ -38,24 +38,13 @@ export default function Hero() {
       <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="flex flex-col items-center text-center max-w-6xl mx-auto">
           
-          {/* Robot Avatar & Top Pill Badge */}
+          {/* Top Pill Badge */}
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5 }}
             className="flex flex-col items-center mb-6"
           >
-            <div className="relative mb-4 group cursor-pointer">
-              <div className="absolute -inset-1.5 bg-gradient-to-r from-cyan-500 via-teal-400 to-purple-600 rounded-full blur-md opacity-75 group-hover:opacity-100 transition duration-500 animate-pulse" />
-              <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden border-2 border-cyan-400/80 shadow-2xl bg-[#090d16] p-1">
-                <img
-                  src="/icon.png"
-                  alt="AuraLink Robot Mascot"
-                  className="w-full h-full object-cover rounded-full group-hover:scale-105 transition-transform duration-300"
-                />
-              </div>
-            </div>
-
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-semibold tracking-wide shadow-lg shadow-cyan-950/40">
               <Zap className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
               <span>AURALINK LINUX TUNNELING ENGINE • ARCH, DEBIAN, FEDORA & RPM</span>

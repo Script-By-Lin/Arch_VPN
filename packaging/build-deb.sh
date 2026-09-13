@@ -35,8 +35,15 @@ ln -sf "/opt/auralink/bin/vpn-core-helper" "$BUILD_DIR/usr/local/bin/vpn-core-he
 
 # Desktop & Icons
 cp "$ROOT_DIR/packaging/auralink.desktop" "$BUILD_DIR/usr/share/applications/"
+mkdir -p "$BUILD_DIR/usr/share/pixmaps"
+cp "$ROOT_DIR/gui/assets/icon.png" "$BUILD_DIR/usr/share/pixmaps/auralink.png"
 cp "$ROOT_DIR/gui/assets/icon.svg" "$BUILD_DIR/usr/share/icons/hicolor/scalable/apps/auralink.svg"
-cp "$ROOT_DIR/gui/assets/icon.png" "$BUILD_DIR/usr/share/icons/hicolor/256x256/apps/auralink.png"
+for s in 16 22 24 32 48 64 128 256 512; do
+  mkdir -p "$BUILD_DIR/usr/share/icons/hicolor/${s}x${s}/apps"
+  if [[ -f "$ROOT_DIR/gui/assets/icons/auralink_${s}x${s}.png" ]]; then
+    cp "$ROOT_DIR/gui/assets/icons/auralink_${s}x${s}.png" "$BUILD_DIR/usr/share/icons/hicolor/${s}x${s}/apps/auralink.png"
+  fi
+done
 
 # Control file
 cat <<EOF > "$BUILD_DIR/DEBIAN/control"

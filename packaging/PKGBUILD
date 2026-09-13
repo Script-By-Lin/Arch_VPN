@@ -20,6 +20,11 @@ package() {
     ln -sf "/opt/auralink/bin/vpn-core-helper" "$pkgdir/usr/local/bin/vpn-core-helper"
 
     install -Dm644 "$srcdir/packaging/auralink.desktop" "$pkgdir/usr/share/applications/auralink.desktop"
+    install -Dm644 "$srcdir/gui/assets/icon.png" "$pkgdir/usr/share/pixmaps/auralink.png"
     install -Dm644 "$srcdir/gui/assets/icon.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/auralink.svg"
-    install -Dm644 "$srcdir/gui/assets/icon.png" "$pkgdir/usr/share/icons/hicolor/256x256/apps/auralink.png"
+    for s in 16 22 24 32 48 64 128 256 512; do
+        if [ -f "$srcdir/gui/assets/icons/auralink_${s}x${s}.png" ]; then
+            install -Dm644 "$srcdir/gui/assets/icons/auralink_${s}x${s}.png" "$pkgdir/usr/share/icons/hicolor/${s}x${s}/apps/auralink.png"
+        fi
+    done
 }

@@ -116,14 +116,23 @@ export default function LiveDemoWidget() {
     addLog("CONFIG", "Default server profiles restored.");
   };
 
-  // Live telemetry speed generator when connected
+  // Live telemetry speed generator & real-time log stream when connected
   useEffect(() => {
     if (!connected) return;
+    let counter = 0;
     const interval = setInterval(() => {
+      counter++;
       const down = (Math.random() * 25 + 38).toFixed(1);
       const up = (Math.random() * 8 + 8).toFixed(1);
       setDownloadSpeed(down);
       setUploadSpeed(up);
+
+      if (counter % 3 === 0) {
+        const sampleHosts = ["1.1.1.1:443", "142.250.190.46:443", "104.21.48.1:443", "151.101.1.140:443"];
+        const targetHost = sampleHosts[Math.floor(Math.random() * sampleHosts.length)];
+        const bytes = (Math.random() * 64 + 16).toFixed(1);
+        addLog("STREAM", `Forwarded ${bytes} KB TCP stream -> ${targetHost} via ss-rust cipher.`);
+      }
     }, 1400);
     return () => clearInterval(interval);
   }, [connected]);

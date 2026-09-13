@@ -258,13 +258,17 @@ echo -e "${GREEN}[✓] Sudoers rule installed at $SUDOERS_FILE${RESET}"
 # 5. Install Desktop Entry and Icons
 echo -e "${CYAN}[5/6] Installing desktop shortcut and icons...${RESET}"
 mkdir -p /usr/share/applications
-mkdir -p /usr/share/icons/hicolor/scalable/apps
-mkdir -p /usr/share/icons/hicolor/256x256/apps
+mkdir -p /usr/share/pixmaps
 
+cp "$SRC_DIR/gui/assets/icon.png" /usr/share/pixmaps/auralink.png 2>/dev/null || true
 cp "$SRC_DIR/gui/assets/icon.svg" /usr/share/icons/hicolor/scalable/apps/auralink.svg 2>/dev/null || true
-cp "$SRC_DIR/gui/assets/icon.png" /usr/share/icons/hicolor/256x256/apps/auralink.png 2>/dev/null || true
-cp "$SRC_DIR/gui/assets/icon.svg" /usr/share/icons/hicolor/scalable/apps/shadowtun.svg 2>/dev/null || true
-cp "$SRC_DIR/gui/assets/icon.png" /usr/share/icons/hicolor/256x256/apps/shadowtun.png 2>/dev/null || true
+
+for s in 16 22 24 32 48 64 128 256 512; do
+  mkdir -p "/usr/share/icons/hicolor/${s}x${s}/apps"
+  if [[ -f "$SRC_DIR/gui/assets/icons/auralink_${s}x${s}.png" ]]; then
+    cp "$SRC_DIR/gui/assets/icons/auralink_${s}x${s}.png" "/usr/share/icons/hicolor/${s}x${s}/apps/auralink.png" 2>/dev/null || true
+  fi
+done
 
 if [[ -f "$SRC_DIR/packaging/auralink.desktop" ]]; then
   cp "$SRC_DIR/packaging/auralink.desktop" /usr/share/applications/auralink.desktop

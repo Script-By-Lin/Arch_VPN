@@ -740,6 +740,12 @@ class MainWindow(QMainWindow):
 
     def _service_listener(self, event_type: str, data: dict):
         self.signals.state_changed.emit(event_type, data)
+        msg = data.get("message")
+        err = data.get("error")
+        if msg:
+            self.signals.log_message.emit(f"[{event_type.upper()}] {msg}")
+        elif err:
+            self.signals.log_message.emit(f"[ERROR] {err}")
 
     def init_ui(self):
         self.setWindowTitle("AuraLink GUI")
@@ -1007,6 +1013,7 @@ class MainWindow(QMainWindow):
 
         self.txt_logs = QPlainTextEdit()
         self.txt_logs.setReadOnly(True)
+        self.txt_logs.setMaximumBlockCount(500)
         self.txt_logs.setStyleSheet("background-color: transparent; border: none; color: #94A3B8; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 10.5px; line-height: 1.4;")
         lc_vbox.addWidget(self.txt_logs, 1)
 
@@ -1236,19 +1243,14 @@ class MainWindow(QMainWindow):
 
     def on_stats_updated(self, stats: dict):
         if self.service.state == STATE_CONNECTED:
-            rx_bytes_sec = stats.get("rx_rate", 0.0)
-            tx_bytes_sec = stats.get("tx_rate", 0.0)
-            
-            rx_mb = rx_bytes_sec / (1024 * 1024)
-            tx_mb = tx_bytes_sec / (1024 * 1024)
-            
-            self.lbl_speed_down.setText(f"{rx_mb:.1f} MB/s")
-            self.lbl_speed_up.setText(f"{tx_mb:.1f} MB/s")
+            rx_speed = stats.get("rx_speed_str", "0.0 B/s")
+            tx_speed = stats.get("tx_speed_str", "0.0 B/s")
+            self.lbl_speed_down.setText(rx_speed)
+            self.lbl_speed_up.setText(tx_speed)
 
     def on_log_updated(self, logs: list):
         if logs:
-            self.txt_logs.clear()
-            for l in logs[-25:]:
+            for l in logs:
                 self.txt_logs.appendPlainText(l)
             self.txt_logs.verticalScrollBar().setValue(self.txt_logs.verticalScrollBar().maximum())
 
@@ -1273,9 +1275,56 @@ class MainWindow(QMainWindow):
         threading.Thread(target=_worker, daemon=True).start()
 
     def init_timers(self):
+        self._log_offset_ss = 0
+        self._log_offset_tun = 0
+        self._init_logs()
+
         self.stats_timer = QTimer(self)
         self.stats_timer.timeout.connect(self._poll_stats)
         self.stats_timer.start(1000)
+
+        self.log_timer = QTimer(self)
+        self.log_timer.timeout.connect(self._poll_live_logs)
+        self.log_timer.start(400)
+
+    def _init_logs(self):
+        recent = self.service.process_mgr.get_recent_logs(max_lines=30)
+        if recent:
+            for line in recent:
+                self.txt_logs.appendPlainText(line)
+        else:
+            self.txt_logs.appendPlainText(f"[{time.strftime('%I:%M:%S %p')}] [AuraLink] Cyber-Obsidian GUI ready. Select server and connect.")
+        self.txt_logs.verticalScrollBar().setValue(self.txt_logs.verticalScrollBar().maximum())
+
+        # Sync offsets to current file sizes
+        if os.path.exists(self.service.process_mgr.sslocal_log):
+            self._log_offset_ss = os.path.getsize(self.service.process_mgr.sslocal_log)
+        if os.path.exists(self.service.process_mgr.tun2socks_log):
+            self._log_offset_tun = os.path.getsize(self.service.process_mgr.tun2socks_log)
+
+    def _poll_live_logs(self):
+        new_ss, self._log_offset_ss = self.service.process_mgr._read_new_lines(
+            self.service.process_mgr.sslocal_log, self._log_offset_ss
+        )
+        new_tun, self._log_offset_tun = self.service.process_mgr._read_new_lines(
+            self.service.process_mgr.tun2socks_log, self._log_offset_tun
+        )
+
+        batch = []
+        for line in new_ss:
+            s = line.strip()
+            if s:
+                batch.append((self.service.process_mgr._parse_timestamp(s), f"[sslocal] {s}"))
+        for line in new_tun:
+            s = line.strip()
+            if s:
+                batch.append((self.service.process_mgr._parse_timestamp(s), f"[tun2socks] {s}"))
+
+        if batch:
+            batch.sort(key=lambda x: x[0])
+            for _, formatted in batch:
+                self.txt_logs.appendPlainText(formatted)
+            self.txt_logs.verticalScrollBar().setValue(self.txt_logs.verticalScrollBar().maximum())
 
     def _poll_stats(self):
         if self.service.state == STATE_CONNECTED:

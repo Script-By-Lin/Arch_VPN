@@ -31,6 +31,14 @@ ACTIVE_CONFIG_FILE = os.path.join(CONFIG_DIR, "active_config.json")
 SETTINGS_FILE = os.path.join(CONFIG_DIR, "settings.json")
 
 
+DNS_PRESETS = {
+    "Cloudflare (1.1.1.1 / 1.0.0.1)": ("1.1.1.1", "1.0.0.1"),
+    "Google (8.8.8.8 / 8.8.4.4)": ("8.8.8.8", "8.8.4.4"),
+    "Quad9 (9.9.9.9 / 149.112.112.112)": ("9.9.9.9", "149.112.112.112"),
+    "AdGuard (94.140.14.14 / 94.140.15.15)": ("94.140.14.14", "94.140.15.15")
+}
+
+
 class ConfigError(Exception):
     """Custom exception for configuration or fetching errors."""
     pass
@@ -48,6 +56,7 @@ class ConfigManager:
             default_settings = {
                 "dns": "1.1.1.1",
                 "dns_backup": "8.8.8.8",
+                "dns_preset": "Cloudflare (1.1.1.1 / 1.0.0.1)",
                 "socks_host": "127.0.0.1",
                 "socks_port": 1080,
                 "tun_device": "tun0",
@@ -61,19 +70,28 @@ class ConfigManager:
     def get_settings(self) -> Dict[str, Any]:
         try:
             with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
+                data = json.load(f)
+                if not isinstance(data, dict):
+                    data = {}
         except Exception:
-            return {
-                "dns": "1.1.1.1",
-                "dns_backup": "8.8.8.8",
-                "socks_host": "127.0.0.1",
-                "socks_port": 1080,
-                "tun_device": "tun0",
-                "tun_ip": "10.0.0.2/24",
-                "auto_reconnect": True,
-                "killswitch": True,
-                "active_profile_id": None
-            }
+            data = {}
+
+        defaults = {
+            "dns": "1.1.1.1",
+            "dns_backup": "8.8.8.8",
+            "dns_preset": "Cloudflare (1.1.1.1 / 1.0.0.1)",
+            "socks_host": "127.0.0.1",
+            "socks_port": 1080,
+            "tun_device": "tun0",
+            "tun_ip": "10.0.0.2/24",
+            "auto_reconnect": True,
+            "killswitch": True,
+            "active_profile_id": None
+        }
+        for k, v in defaults.items():
+            if k not in data:
+                data[k] = v
+        return data
 
     def save_settings(self, settings: Dict[str, Any]):
         with open(SETTINGS_FILE, "w", encoding="utf-8") as f:

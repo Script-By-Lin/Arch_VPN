@@ -34,6 +34,7 @@ from core import (
     ConfigManager,
     ConfigError,
     StatsMonitor,
+    DNS_PRESETS,
     STATE_CONNECTED,
     STATE_CONNECTING,
     STATE_DISCONNECTED,
@@ -984,12 +985,21 @@ class MainWindow(QMainWindow):
         nc_vbox.addWidget(lbl_dns_title)
 
         self.combo_dns = ModernDropdown("Select DNS...")
-        self.combo_dns.addItems([
-            "Cloudflare (1.1.1.1 / 1.0.0.1)",
-            "Google (8.8.8.8 / 8.8.4.4)",
-            "Quad9 (9.9.9.9 / 149.112.112.112)",
-            "AdGuard (94.140.14.14 / 94.140.15.15)"
-        ])
+        preset_keys = list(DNS_PRESETS.keys())
+        self.combo_dns.addItems(preset_keys)
+
+        # Restore saved DNS setting
+        saved_preset = self.service.config_mgr.get_setting("dns_preset")
+        saved_primary = self.service.config_mgr.get_setting("dns", "1.1.1.1")
+        initial_idx = 0
+        if saved_preset and saved_preset in preset_keys:
+            initial_idx = preset_keys.index(saved_preset)
+        elif saved_primary:
+            for idx, p_key in enumerate(preset_keys):
+                if DNS_PRESETS[p_key][0] == saved_primary:
+                    initial_idx = idx
+                    break
+        self.combo_dns.setCurrentIndex(initial_idx)
         self.combo_dns.currentIndexChanged.connect(self.on_dns_changed)
         nc_vbox.addWidget(self.combo_dns)
 
@@ -1053,8 +1063,17 @@ class MainWindow(QMainWindow):
 
     def on_dns_changed(self):
         dns_choice = self.combo_dns.currentText()
-        self.service.config_mgr.set_setting("dns_server", dns_choice)
-        self.append_ui_log(f"[DNS] Resolver set to {dns_choice.split(' ')[0]}")
+        if not dns_choice or dns_choice not in DNS_PRESETS:
+            return
+
+        p_dns, b_dns = DNS_PRESETS[dns_choice]
+        self.service.set_dns(primary_dns=p_dns, backup_dns=b_dns, preset_name=dns_choice)
+        provider_name = dns_choice.split(" ")[0]
+
+        if self.service.state == STATE_CONNECTED:
+            self.append_ui_log(f"[DNS] Live upstream updated to {provider_name} ({p_dns})")
+        else:
+            self.append_ui_log(f"[DNS] Upstream resolver set to {provider_name} ({p_dns})")
 
     def on_quick_import(self):
         raw = self.input_import_key.text().strip()

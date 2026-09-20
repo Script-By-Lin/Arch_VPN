@@ -311,5 +311,53 @@ class VPNService:
                 self._notify("error", {"error": self._last_error})
                 return False
 
+    def set_dns(self, primary_dns: str, backup_dns: Optional[str] = "8.8.8.8", preset_name: Optional[str] = None) -> bool:
+        """
+        Updates DNS settings and applies them live if VPN is currently connected.
+        """
+        p_dns = primary_dns.strip()
+        b_dns = (backup_dns or "").strip()
+
+        settings = self.config_mgr.get_settings()
+        settings["dns"] = p_dns
+        settings["dns_backup"] = b_dns
+        if preset_name:
+            settings["dns_preset"] = preset_name
+        self.config_mgr.save_settings(settings)
+
+        if self._state == STATE_CONNECTED:
+            tun_dev = settings.get("tun_device", "tun0")
+            success = self.network_mgr.configure_dns(
+                tun_name=tun_dev,
+                primary_dns=p_dns,
+                backup_dns=b_dns
+            )
+            if os.path.exists(SESSION_FILE):
+                try:
+                    with open(SESSION_FILE, "r") as f:
+                        session_data = json.load(f)
+                    session_data["dns_primary"] = p_dns
+                    session_data["dns_backup"] = b_dns
+                    with open(SESSION_FILE, "w") as f:
+                        json.dump(session_data, f, indent=2)
+                except Exception:
+                    pass
+
+            self._notify("dns_updated", {
+                "message": f"Updated active DNS to {p_dns} ({preset_name or 'Custom'})",
+                "primary_dns": p_dns,
+                "backup_dns": b_dns,
+                "preset": preset_name
+            })
+            return success
+        else:
+            self._notify("dns_updated", {
+                "message": f"DNS resolver set to {preset_name or p_dns}",
+                "primary_dns": p_dns,
+                "backup_dns": b_dns,
+                "preset": preset_name
+            })
+            return True
+
     def get_stats(self) -> Dict[str, Any]:
         return self.stats_monitor.get_stats()

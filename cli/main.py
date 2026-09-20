@@ -19,6 +19,7 @@ from core import (
     ConfigManager,
     ConfigError,
     StatsMonitor,
+    DNS_PRESETS,
     STATE_CONNECTED,
     STATE_CONNECTING,
     STATE_DISCONNECTED,
@@ -232,6 +233,71 @@ def cmd_logs(args, service: VPNService):
             print(format_log_entry(line))
 
 
+def cmd_dns(args, service: VPNService):
+    settings = service.config_mgr.get_settings()
+    current_primary = settings.get("dns", "1.1.1.1")
+    current_backup = settings.get("dns_backup", "8.8.8.8")
+    current_preset = settings.get("dns_preset", "Cloudflare (1.1.1.1 / 1.0.0.1)")
+
+    action = (args.action or "show").lower()
+
+    if action == "set":
+        target = (args.target or "").strip()
+        if not target:
+            print(f"{RED}[✗] Please specify a DNS preset or IP address.{RESET}")
+            print("Examples:")
+            print(f"  {BOLD}auralink dns set cloudflare{RESET}")
+            print(f"  {BOLD}auralink dns set google{RESET}")
+            print(f"  {BOLD}auralink dns set quad9{RESET}")
+            print(f"  {BOLD}auralink dns set adguard{RESET}")
+            print(f"  {BOLD}auralink dns set 1.1.1.1 1.0.0.1{RESET}")
+            sys.exit(1)
+
+        # Match preset
+        matched_preset = None
+        for p_name, ips in DNS_PRESETS.items():
+            short = p_name.split()[0].lower()
+            if target.lower() in (short, p_name.lower()):
+                matched_preset = (p_name, ips[0], ips[1])
+                break
+
+        if matched_preset:
+            p_name, p_ip, b_ip = matched_preset
+            service.set_dns(p_ip, b_ip, preset_name=p_name)
+            print(f"{GREEN}{BOLD}[✓] DNS Upstream set to {p_name}{RESET} ({p_ip} / {b_ip})")
+            if service.state == STATE_CONNECTED:
+                print(f"    {GREEN}● Applied live to active VPN interface.{RESET}")
+        else:
+            # Custom IP
+            p_ip = target
+            b_ip = args.backup_ip or "8.8.8.8"
+            service.set_dns(p_ip, b_ip, preset_name=f"Custom ({p_ip})")
+            print(f"{GREEN}{BOLD}[✓] DNS Upstream set to Custom{RESET} ({p_ip} / {b_ip})")
+            if service.state == STATE_CONNECTED:
+                print(f"    {GREEN}● Applied live to active VPN interface.{RESET}")
+
+    else:
+        # Show / List
+        print(f"\n{BOLD}DNS Upstream Resolver Configuration:{RESET}")
+        print(f"  Current DNS : {CYAN}{BOLD}{current_primary}{RESET} / {CYAN}{current_backup}{RESET}")
+        print(f"  Preset Name : {BOLD}{current_preset}{RESET}")
+        if service.state == STATE_CONNECTED:
+            print(f"  Live Status : {GREEN}Active on {settings.get('tun_device', 'tun0')}{RESET}")
+        else:
+            print(f"  Live Status : {YELLOW}Inactive (will apply upon connect){RESET}")
+
+        print(f"\n{BOLD}Available Upstream Presets:{RESET}")
+        print(f"{'PRESET':<40} {'PRIMARY':<16} {'BACKUP':<16} {'STATUS'}")
+        print("-" * 78)
+        for p_name, (p_ip, b_ip) in DNS_PRESETS.items():
+            status = ""
+            if p_ip == current_primary:
+                status = f"{GREEN}● ACTIVE{RESET}"
+            print(f"{p_name:<40} {p_ip:<16} {b_ip:<16} {status}")
+
+        print(f"\nTo switch DNS: {BOLD}auralink dns set <preset|ip> [backup_ip]{RESET}\n")
+
+
 def cmd_gui(args, service: VPNService):
     try:
         from gui.app import launch_gui
@@ -264,6 +330,12 @@ def main():
 
     # Status
     subparsers.add_parser("status", help="Show current VPN status, stats, and active server")
+
+    # DNS
+    p_dns = subparsers.add_parser("dns", help="View or configure DNS upstream resolver")
+    p_dns.add_argument("action", nargs="?", default="show", choices=["show", "list", "set"], help="DNS action (show, list, set)")
+    p_dns.add_argument("target", nargs="?", help="Preset name (cloudflare, google, quad9, adguard) or primary DNS IP")
+    p_dns.add_argument("backup_ip", nargs="?", help="Optional backup DNS IP (when specifying custom IP)")
 
     # Import
     p_import = subparsers.add_parser("import", help="Import a new key (ssconf://, ss://, json)")
@@ -298,6 +370,8 @@ def main():
         cmd_disconnect(args, service)
     elif args.command == "status":
         cmd_status(args, service)
+    elif args.command == "dns":
+        cmd_dns(args, service)
     elif args.command == "import":
         cmd_import(args, service)
     elif args.command == "list":

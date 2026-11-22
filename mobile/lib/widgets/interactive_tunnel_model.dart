@@ -217,24 +217,33 @@ class _InteractiveTunnelModelState extends State<InteractiveTunnelModel>
         children: [
           Row(
             children: [
-              const Text(
-                'INTERACTIVE TUNNEL MODEL',
-                style: TextStyle(
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.w800,
-                  fontFamily: 'monospace',
-                  letterSpacing: 0.6,
-                  color: DaylightColors.textMuted,
+              const Expanded(
+                child: Text(
+                  'INTERACTIVE TUNNEL MODEL',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w800,
+                    fontFamily: 'monospace',
+                    letterSpacing: 0.5,
+                    color: DaylightColors.textMuted,
+                  ),
                 ),
               ),
-              const Spacer(),
-              Text(
-                _stageBadgeText(),
-                style: TextStyle(
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.w800,
-                  fontFamily: 'monospace',
-                  color: _stageBadgeColor(),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  _stageBadgeText(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.right,
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w800,
+                    fontFamily: 'monospace',
+                    color: _stageBadgeColor(),
+                  ),
                 ),
               ),
             ],
@@ -305,7 +314,7 @@ class _InteractiveTunnelModelState extends State<InteractiveTunnelModel>
                                 boxShadow: selected
                                     ? [
                                         BoxShadow(
-                                          color: stroke.withOpacity(0.24),
+                                          color: stroke.withValues(alpha: 0.24),
                                           blurRadius: 8,
                                           spreadRadius: 2,
                                         ),
@@ -386,7 +395,7 @@ class _PipelineTrackPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final y = 14.0;
+    const y = 14.0;
     const leftX = 34.0;
     final rightX = math.max(leftX + 20, size.width - 34.0);
     final span = rightX - leftX;
@@ -401,7 +410,7 @@ class _PipelineTrackPainter extends CustomPainter {
                 : DaylightColors.borderLight;
 
     canvas.drawLine(
-      Offset(leftX, y),
+      const Offset(leftX, y),
       Offset(rightX, y),
       Paint()
         ..color = trackColor
@@ -420,7 +429,7 @@ class _PipelineTrackPainter extends CustomPainter {
         canvas.drawCircle(
           Offset(x, y),
           5.5,
-          Paint()..color = dotCol.withOpacity(0.24),
+          Paint()..color = dotCol.withValues(alpha: 0.24),
         );
         canvas.drawCircle(
           Offset(x, y),

@@ -79,6 +79,22 @@ class FreeKeysDB:
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_free_keys_published ON free_keys (is_published, sort_order, region)"
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS mobile_release (
+                    id TEXT PRIMARY KEY,
+                    platform TEXT NOT NULL DEFAULT 'android',
+                    version TEXT NOT NULL DEFAULT '1.0.0',
+                    download_url TEXT NOT NULL DEFAULT '',
+                    local_file_path TEXT NOT NULL DEFAULT '',
+                    filename TEXT NOT NULL DEFAULT 'AuraLink-VPN-Android.apk',
+                    size_bytes INTEGER NOT NULL DEFAULT 0,
+                    sha256 TEXT NOT NULL DEFAULT '',
+                    release_notes TEXT NOT NULL DEFAULT '',
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
             conn.commit()
 
     @staticmethod
@@ -225,5 +241,79 @@ class FreeKeysDB:
     def delete_key(self, key_id: str) -> bool:
         with self._connect() as conn:
             cur = conn.execute("DELETE FROM free_keys WHERE id = ?", (key_id,))
+            conn.commit()
+            return cur.rowcount > 0
+
+    # ------------------------------------------------------------------
+    # Mobile APK Release Metadata
+    # ------------------------------------------------------------------
+    def get_mobile_release(self, platform: str = "android") -> Optional[Dict[str, Any]]:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM mobile_release WHERE id = ?", (platform,)
+            ).fetchone()
+            if not row:
+                return None
+            return {
+                "platform": row["platform"],
+                "version": row["version"],
+                "download_url": row["download_url"],
+                "local_file_path": row["local_file_path"],
+                "filename": row["filename"],
+                "size_bytes": row["size_bytes"],
+                "sha256": row["sha256"],
+                "release_notes": row["release_notes"],
+                "updated_at": row["updated_at"],
+            }
+
+    def upsert_mobile_release(
+        self,
+        *,
+        platform: str = "android",
+        version: str = "1.0.0",
+        download_url: str = "",
+        local_file_path: str = "",
+        filename: str = "AuraLink-VPN-Android.apk",
+        size_bytes: int = 0,
+        sha256: str = "",
+        release_notes: str = "",
+    ) -> Dict[str, Any]:
+        now = _utc_now()
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO mobile_release (
+                    id, platform, version, download_url, local_file_path,
+                    filename, size_bytes, sha256, release_notes, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    version = excluded.version,
+                    download_url = excluded.download_url,
+                    local_file_path = excluded.local_file_path,
+                    filename = excluded.filename,
+                    size_bytes = excluded.size_bytes,
+                    sha256 = excluded.sha256,
+                    release_notes = excluded.release_notes,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    platform,
+                    platform,
+                    version,
+                    download_url,
+                    local_file_path,
+                    filename,
+                    int(size_bytes),
+                    sha256,
+                    release_notes,
+                    now,
+                ),
+            )
+            conn.commit()
+        return self.get_mobile_release(platform)  # type: ignore[return-value]
+
+    def delete_mobile_release(self, platform: str = "android") -> bool:
+        with self._connect() as conn:
+            cur = conn.execute("DELETE FROM mobile_release WHERE id = ?", (platform,))
             conn.commit()
             return cur.rowcount > 0

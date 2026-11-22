@@ -30,7 +30,8 @@ class SettingsScreen extends StatelessWidget {
               _SectionCard(
                 title: 'DNS UPSTREAM RESOLVER',
                 child: DropdownButtonFormField<String>(
-                  value: DnsPreset.presets.any((p) => p.name == s.dnsPresetName)
+                  isExpanded: true,
+                  initialValue: DnsPreset.presets.any((p) => p.name == s.dnsPresetName)
                       ? s.dnsPresetName
                       : DnsPreset.presets.first.name,
                   decoration: const InputDecoration(isDense: true),
@@ -40,6 +41,8 @@ class SettingsScreen extends StatelessWidget {
                           value: p.name,
                           child: Text(
                             p.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(fontSize: 13),
                           ),
                         ),
@@ -220,7 +223,7 @@ class _FreeBackendUrlCardState extends State<_FreeBackendUrlCard> {
             controller: _ctrl,
             keyboardType: TextInputType.url,
             decoration: const InputDecoration(
-              hintText: 'https://your-admin-backend.example.com',
+              hintText: 'https://archvpn-production.up.railway.app',
               isDense: true,
             ),
           ),
@@ -262,29 +265,32 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: DaylightColors.bgSurface,
+    return Material(
+      color: DaylightColors.bgSurface,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: DaylightColors.border),
+        side: const BorderSide(color: DaylightColors.border),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              fontFamily: 'monospace',
-              letterSpacing: 0.7,
-              color: DaylightColors.textMuted,
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                fontFamily: 'monospace',
+                letterSpacing: 0.7,
+                color: DaylightColors.textMuted,
+              ),
             ),
-          ),
-          const SizedBox(height: 10),
-          child,
-        ],
+            const SizedBox(height: 10),
+            child,
+          ],
+        ),
       ),
     );
   }

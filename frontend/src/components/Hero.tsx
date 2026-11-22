@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Terminal, Shield, Zap, ArrowRight, Lock, Activity, Globe, Network } from "lucide-react";
+import { Terminal, Shield, Zap, ArrowRight, Lock, Activity, Globe, Network, Smartphone } from "lucide-react";
 
 export default function Hero() {
   const fullText = "Universal Shadowsocks & tun2socks VPN for Linux";
@@ -149,6 +149,16 @@ export default function Hero() {
               <Terminal className="w-4 h-4 text-white group-hover:scale-110 transition-transform" />
               <span>Get 1-Line Install Command</span>
               <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
+            </motion.a>
+
+            <motion.a
+              whileHover={{ y: -2, scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              href="#mobile-download"
+              className="w-full sm:w-auto px-7 py-3.5 rounded-xl font-bold text-sm text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 hover:border-emerald-300 shadow-sm transition-all flex items-center justify-center gap-2"
+            >
+              <Smartphone className="w-4 h-4 text-emerald-600" />
+              <span>Download Android APK</span>
             </motion.a>
 
             <motion.a

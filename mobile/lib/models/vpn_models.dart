@@ -190,7 +190,7 @@ class VpnSettings {
     this.udpRelay = true,
     this.verifyTunnel = true,
     this.demoMode = false,
-    this.freeKeysBackendUrl = 'http://10.0.2.2:8088',
+    this.freeKeysBackendUrl = 'https://archvpn-production.up.railway.app',
     this.activeProfileId,
   });
 
@@ -243,8 +243,13 @@ class VpnSettings {
       verifyTunnel:
           json['verify_tunnel'] is bool ? json['verify_tunnel'] as bool : true,
       demoMode: json['demo_mode'] is bool ? json['demo_mode'] as bool : false,
-      freeKeysBackendUrl:
-          json['free_keys_backend_url']?.toString() ?? 'http://10.0.2.2:8088',
+      freeKeysBackendUrl: (() {
+        final saved = json['free_keys_backend_url']?.toString().trim() ?? '';
+        if (saved.isEmpty || saved == 'http://10.0.2.2:8088') {
+          return 'https://archvpn-production.up.railway.app';
+        }
+        return saved;
+      })(),
       activeProfileId: json['active_profile_id']?.toString(),
     );
   }

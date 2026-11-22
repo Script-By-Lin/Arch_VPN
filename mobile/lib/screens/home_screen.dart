@@ -37,7 +37,7 @@ class HomeScreen extends StatelessWidget {
                       border: Border.all(color: DaylightColors.border),
                       boxShadow: [
                         BoxShadow(
-                          color: DaylightColors.textPrimary.withOpacity(0.05),
+                          color: DaylightColors.textPrimary.withValues(alpha: 0.05),
                           blurRadius: 20,
                           offset: const Offset(0, 6),
                         ),
@@ -143,37 +143,47 @@ class HomeScreen extends StatelessWidget {
 
     return Row(
       children: [
-        const Text(
-          'AuraLink',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            color: DaylightColors.textPrimary,
-            letterSpacing: -0.3,
+        Expanded(
+          child: Row(
+            children: [
+              const Flexible(
+                child: Text(
+                  'AuraLink',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: DaylightColors.textPrimary,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: DaylightColors.primarySoft,
+                  borderRadius: BorderRadius.circular(7),
+                  border: Border.all(color: DaylightColors.primaryBorder),
+                ),
+                child: Text(
+                  ctrl.isUsingDemoEngine ? 'DEMO' : 'DAYLIGHT',
+                  style: const TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    fontFamily: 'monospace',
+                    color: DaylightColors.primaryDark,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
-        const SizedBox(width: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-          decoration: BoxDecoration(
-            color: DaylightColors.primarySoft,
-            borderRadius: BorderRadius.circular(7),
-            border: Border.all(color: DaylightColors.primaryBorder),
-          ),
-          child: Text(
-            ctrl.isUsingDemoEngine ? 'DAYLIGHT • DEMO' : 'DAYLIGHT',
-            style: const TextStyle(
-              fontSize: 9.5,
-              fontWeight: FontWeight.w800,
-              fontFamily: 'monospace',
-              color: DaylightColors.primaryDark,
-            ),
-          ),
-        ),
-        const Spacer(),
+        const SizedBox(width: 6),
         // IPv6 Shield pill
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
           decoration: BoxDecoration(
             color: ctrl.ipv6ShieldActive
                 ? DaylightColors.successSoft
@@ -190,16 +200,16 @@ class HomeScreen extends StatelessWidget {
             children: [
               Icon(
                 Icons.shield_outlined,
-                size: 12,
+                size: 11,
                 color: ctrl.ipv6ShieldActive
                     ? DaylightColors.successDark
                     : DaylightColors.textMuted,
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: 3),
               Text(
-                ctrl.ipv6ShieldActive ? 'IPv6 OFF' : 'IPv6 GUARD',
+                ctrl.ipv6ShieldActive ? 'IPv6 OFF' : 'IPv6',
                 style: TextStyle(
-                  fontSize: 9.5,
+                  fontSize: 9,
                   fontWeight: FontWeight.w700,
                   fontFamily: 'monospace',
                   color: ctrl.ipv6ShieldActive
@@ -212,7 +222,7 @@ class HomeScreen extends StatelessWidget {
         ),
         const SizedBox(width: 6),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
           decoration: BoxDecoration(
             color: pillBg,
             borderRadius: BorderRadius.circular(12),
@@ -221,7 +231,7 @@ class HomeScreen extends StatelessWidget {
           child: Text(
             statusLabel,
             style: TextStyle(
-              fontSize: 10,
+              fontSize: 9.5,
               fontWeight: FontWeight.w800,
               fontFamily: 'monospace',
               color: pillFg,

@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { Copy, Check, ShieldCheck } from "lucide-react";
 import { DISTRO_INSTALLS } from "@/data/appData";
+import MobileDownloadCard from "./MobileDownloadCard";
 
 export default function DownlinkCard() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -35,8 +36,13 @@ export default function DownlinkCard() {
           </div>
 
           <p className="text-slate-600 text-base sm:text-lg leading-relaxed max-w-3xl">
-            Work with AuraLink directly in your terminal or desktop. Full TUN encapsulation, automatic subscription decoding, kernel IPv6 leak blocking, and zero-leak DNS across every major Linux distribution.
+            Work with AuraLink on Android mobile or directly in your Linux terminal and desktop. Full TUN encapsulation, automatic subscription decoding, kernel IPv6 leak blocking, and zero-leak DNS.
           </p>
+
+          {/* Dynamic Mobile Android APK Download Card (fetched from Railway backend) */}
+          <div className="pt-2">
+            <MobileDownloadCard />
+          </div>
 
           {/* Platform Sections */}
           <div className="pt-4 space-y-6">

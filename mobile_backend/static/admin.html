@@ -303,6 +303,41 @@
 
       <section class="card">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+          <h2 style="margin:0;">Mobile App APK Download Link (Frontend)</h2>
+          <span id="apkStatusPill" class="pill draft">NOT SET</span>
+        </div>
+        <div id="apkCurrentMeta" class="meta" style="margin-bottom:12px;">Loading release info...</div>
+
+        <form id="apkLinkForm" onsubmit="saveApkLink(event)" style="margin-bottom:14px;">
+          <div class="grid-2" style="margin-bottom:10px;">
+            <div>
+              <label for="apkVersionInput">App Version</label>
+              <input id="apkVersionInput" type="text" value="1.0.0" placeholder="1.0.0" required />
+            </div>
+            <div>
+              <label for="apkUrlInput">External APK Download URL (GitHub Release / Drive / CDN)</label>
+              <input id="apkUrlInput" type="url" placeholder="https://github.com/.../AuraLink-VPN-Android.apk" />
+            </div>
+          </div>
+          <div style="margin-bottom:10px;">
+            <label for="apkNotesInput">Release Notes (shown on Frontend Download Card)</label>
+            <input id="apkNotesInput" type="text" placeholder="Android ARM64 native Shadowsocks + TUN + Free Region Cards" />
+          </div>
+          <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+            <button type="submit" class="btn-primary">Save External Download Link</button>
+            <label class="btn-ghost" style="display:inline-flex; align-items:center; gap:6px; margin:0; cursor:pointer;">
+              <span>Or Upload .apk Directly</span>
+              <input id="apkFileInput" type="file" accept=".apk,application/vnd.android.package-archive" style="display:none;" onchange="uploadApkFile(event)" />
+            </label>
+            <a id="apkTestLink" href="/api/mobile/download/apk" target="_blank" class="hidden" style="text-decoration:none;">
+              <button type="button" class="btn-ghost">Test Download</button>
+            </a>
+          </div>
+        </form>
+      </section>
+
+      <section class="card">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
           <h2 style="margin:0;">Mobile Free Region Cards</h2>
           <button type="button" class="btn-ghost" onclick="loadKeys()">Refresh</button>
         </div>
@@ -360,7 +395,7 @@
         document.getElementById("loginSection").classList.add("hidden");
         document.getElementById("dashboardSection").classList.remove("hidden");
         document.getElementById("headerActions").classList.remove("hidden");
-        await loadKeys();
+        await Promise.all([loadKeys(), loadMobileRelease()]);
       } catch (err) {
         adminToken = "";
         sessionStorage.removeItem("auralink_admin_token");
@@ -468,6 +503,88 @@
           </div>
         </div>
       `).join("");
+    }
+
+    function fmtBytes(b) {
+      if (!b || b <= 0) return "";
+      const mb = b / (1024 * 1024);
+      return mb >= 1 ? `${mb.toFixed(1)} MB` : `${(b / 1024).toFixed(0)} KB`;
+    }
+
+    async function loadMobileRelease() {
+      try {
+        const rel = await api("/api/admin/mobile-release");
+        const pill = document.getElementById("apkStatusPill");
+        const meta = document.getElementById("apkCurrentMeta");
+        const testBtn = document.getElementById("apkTestLink");
+        if (rel.version) document.getElementById("apkVersionInput").value = rel.version;
+        if (rel.release_notes) document.getElementById("apkNotesInput").value = rel.release_notes;
+        if (!rel.hosted_locally && rel.download_url) {
+          document.getElementById("apkUrlInput").value = rel.download_url;
+        }
+        if (rel.available) {
+          pill.textContent = rel.hosted_locally ? `HOSTED v${rel.version}` : `LINKED v${rel.version}`;
+          pill.className = "pill free";
+          const sz = fmtBytes(rel.size_bytes);
+          meta.textContent = `Live URL: ${rel.download_url}${sz ? ' • ' + sz : ''}${rel.sha256 ? ' • SHA256: ' + rel.sha256.slice(0, 14) + '...' : ''}`;
+          testBtn.href = rel.download_url;
+          testBtn.classList.remove("hidden");
+        } else {
+          pill.textContent = "NOT SET";
+          pill.className = "pill draft";
+          meta.textContent = "No Android APK link configured yet. Paste a release link or upload app-release.apk below.";
+          testBtn.classList.add("hidden");
+        }
+      } catch (err) {
+        showAlert(err.message, true);
+      }
+    }
+
+    async function saveApkLink(ev) {
+      ev.preventDefault();
+      const url = document.getElementById("apkUrlInput").value.trim();
+      if (!url) { showAlert("Please enter a download URL or upload an .apk file.", true); return; }
+      try {
+        await api("/api/admin/mobile-release", {
+          method: "PUT",
+          body: JSON.stringify({
+            version: document.getElementById("apkVersionInput").value.trim() || "1.0.0",
+            download_url: url,
+            release_notes: document.getElementById("apkNotesInput").value.trim()
+          })
+        });
+        showAlert("Saved Mobile APK download link!");
+        await loadMobileRelease();
+      } catch (err) {
+        showAlert(err.message, true);
+      }
+    }
+
+    async function uploadApkFile(ev) {
+      const file = ev.target.files && ev.target.files[0];
+      if (!file) return;
+      showAlert(`Uploading ${file.name} (${fmtBytes(file.size)})...`);
+      try {
+        const res = await fetch("/api/admin/mobile-release/upload-apk", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/octet-stream",
+            "X-Admin-Token": adminToken,
+            "X-Release-Version": document.getElementById("apkVersionInput").value.trim() || "1.0.0",
+            "X-Release-Notes": document.getElementById("apkNotesInput").value.trim(),
+            "X-Filename": file.name
+          },
+          body: file
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+        showAlert(`Uploaded ${file.name} and published live download link!`);
+        await loadMobileRelease();
+      } catch (err) {
+        showAlert(err.message, true);
+      } finally {
+        ev.target.value = "";
+      }
     }
 
     if (adminToken) {

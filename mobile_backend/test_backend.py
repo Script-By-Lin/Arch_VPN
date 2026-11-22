@@ -129,6 +129,57 @@ class TestMobileFreeKeysBackend(unittest.TestCase):
         self.assertEqual(page.status_code, 200)
         self.assertIn("AuraLink Mobile Admin", page.text)
 
+    def test_mobile_apk_release_link_and_upload(self):
+        # 1. Initially unavailable
+        r0 = self.client.get("/api/mobile/release")
+        self.assertEqual(r0.status_code, 200)
+        self.assertFalse(r0.json()["available"])
+
+        # 2. Admin sets external APK link
+        r1 = self.client.put(
+            "/api/admin/mobile-release",
+            headers=self.admin_headers,
+            json={
+                "version": "1.2.0",
+                "download_url": "https://example.com/AuraLink-1.2.0.apk",
+                "release_notes": "Initial Android release",
+            },
+        )
+        self.assertEqual(r1.status_code, 200)
+        rel = self.client.get("/api/mobile/release").json()
+        self.assertTrue(rel["available"])
+        self.assertEqual(rel["version"], "1.2.0")
+        self.assertEqual(rel["download_url"], "https://example.com/AuraLink-1.2.0.apk")
+
+        # 3. Admin uploads APK binary directly and downloads it back
+        fake_apk = b"PK\x03\x04fake-auralink-apk-payload"
+        up = self.client.post(
+            "/api/admin/mobile-release/upload-apk",
+            headers={
+                **self.admin_headers,
+                "Content-Type": "application/octet-stream",
+                "X-Release-Version": "1.3.0",
+                "X-Release-Notes": "Direct Railway hosted APK",
+                "X-Filename": "AuraLink-VPN-Android.apk",
+            },
+            content=fake_apk,
+        )
+        self.assertEqual(up.status_code, 201)
+        rel2 = self.client.get("/api/mobile/release").json()
+        self.assertTrue(rel2["available"])
+        self.assertTrue(rel2["hosted_locally"])
+        self.assertEqual(rel2["size_bytes"], len(fake_apk))
+        self.assertTrue(rel2["download_url"].endswith("/api/mobile/download/apk"))
+
+        dl = self.client.get("/api/mobile/download/apk")
+        self.assertEqual(dl.status_code, 200)
+        self.assertEqual(dl.content, fake_apk)
+
+        # 4. Delete clears release
+        d = self.client.delete("/api/admin/mobile-release", headers=self.admin_headers)
+        self.assertEqual(d.status_code, 200)
+        self.assertFalse(self.client.get("/api/mobile/release").json()["available"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -49,12 +49,12 @@ class FreeRegionCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: isConnected ? DaylightColors.successSoft.withOpacity(0.45) : DaylightColors.bgSurface,
+        color: isConnected ? DaylightColors.successSoft.withValues(alpha: 0.45) : DaylightColors.bgSurface,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: borderColor, width: isActive ? 1.6 : 1.0),
         boxShadow: [
           BoxShadow(
-            color: DaylightColors.textPrimary.withOpacity(0.04),
+            color: DaylightColors.textPrimary.withValues(alpha: 0.04),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),

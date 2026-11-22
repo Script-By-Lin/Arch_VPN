@@ -21,16 +21,20 @@ class LogsScreen extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const Text(
-                      '>_ Log Stream',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                        fontFamily: 'monospace',
-                        color: DaylightColors.textPrimary,
+                    const Expanded(
+                      child: Text(
+                        '>_ Log Stream',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          fontFamily: 'monospace',
+                          color: DaylightColors.textPrimary,
+                        ),
                       ),
                     ),
-                    const Spacer(),
+                    const SizedBox(width: 6),
                     _MiniActionChip(
                       label: ctrl.logWrap ? 'Wrap: On' : 'Wrap: Off',
                       onTap: ctrl.toggleLogWrap,

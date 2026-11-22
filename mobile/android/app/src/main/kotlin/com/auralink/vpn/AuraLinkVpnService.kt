@@ -10,10 +10,12 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.ParcelFileDescriptor
+import android.system.Os
 import android.system.OsConstants
 import io.flutter.plugin.common.EventChannel
 import java.io.BufferedReader
 import java.io.File
+import java.io.FileDescriptor
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.InetSocketAddress
@@ -188,17 +190,28 @@ class AuraLinkVpnService : VpnService() {
             tunInterface = pfd
             if (checkCancelled()) return
 
-            // Stage 4/5: Attach tun2socks to TUN file descriptor
+            // Stage 4/5: Attach tun2socks to TUN file descriptor (Os.dup clears FD_CLOEXEC so child inherits FD)
             emitStage("routing", "4/5: Routes & DNS", "Attaching tun2socks to TUN & applying DNS $dnsPrimary...")
-            val fdNum = pfd.fd
+            val dupFd: FileDescriptor = Os.dup(pfd.fileDescriptor)
+            val inheritedFdNum = try {
+                val field = FileDescriptor::class.java.getDeclaredField("descriptor")
+                field.isAccessible = true
+                field.getInt(dupFd)
+            } catch (_: Exception) {
+                pfd.fd
+            }
             tun2socksProcess = ProcessBuilder(
                 tun2socksBin.absolutePath,
-                "-device", "fd://$fdNum",
+                "-device", "fd://$inheritedFdNum",
+                "-mtu", "1500",
                 "-proxy", "socks5://127.0.0.1:1080",
                 "-loglevel", "info"
             )
                 .redirectErrorStream(true)
                 .start()
+            try {
+                Os.close(dupFd)
+            } catch (_: Exception) {}
             pipeProcessLogs("tun2socks", tun2socksProcess!!)
 
             Thread.sleep(250)

@@ -8,14 +8,16 @@ Purpose:
 - Public Mobile feed (`GET /api/mobile/free-keys`) returns only published free keys grouped by region.
 """
 
+import hashlib
 import hmac
 import os
+import re
 import secrets
 from typing import Any, Dict, List, Optional
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from pydantic import BaseModel, Field
 
 from .database import FreeKeysDB, resolve_data_dir
@@ -66,6 +68,22 @@ class UpdateFreeKeyRequest(BaseModel):
     flag: Optional[str] = None
     is_published: Optional[bool] = None
     sort_order: Optional[int] = None
+
+
+class MobileReleaseUpdateRequest(BaseModel):
+    version: str = Field("1.0.0", max_length=32)
+    download_url: str = Field(..., min_length=5, max_length=2048)
+    filename: str = Field("AuraLink-VPN-Android.apk", max_length=128)
+    size_bytes: int = Field(0, ge=0)
+    sha256: str = Field("", max_length=128)
+    release_notes: str = Field("", max_length=1000)
+
+
+def _public_base_url(request: Request) -> str:
+    """Computes public scheme+host respecting Railway X-Forwarded-Proto."""
+    proto = (request.headers.get("x-forwarded-proto") or request.url.scheme or "https").split(",")[0].strip()
+    host = (request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc).split(",")[0].strip()
+    return f"{proto}://{host}".rstrip("/")
 
 
 def create_app(db_path: Optional[str] = None, admin_token: Optional[str] = None) -> FastAPI:
@@ -160,6 +178,198 @@ def create_app(db_path: Optional[str] = None, admin_token: Optional[str] = None)
             "region_cards": list(region_summary.values()),
             "keys": keys,
         }
+
+    # ------------------------------------------------------------------
+    # Public Mobile APK Release Metadata & Direct Download
+    # ------------------------------------------------------------------
+    def _format_release_response(rel: Optional[Dict[str, Any]], request: Request) -> Dict[str, Any]:
+        base = _public_base_url(request)
+        if not rel:
+            env_url = os.environ.get("AURALINK_MOBILE_APK_URL", "").strip()
+            if env_url:
+                return {
+                    "available": True,
+                    "platform": "android",
+                    "version": os.environ.get("AURALINK_MOBILE_APK_VERSION", "1.0.0"),
+                    "download_url": env_url,
+                    "direct_endpoint": f"{base}/api/mobile/download/apk",
+                    "filename": "AuraLink-VPN-Android.apk",
+                    "size_bytes": 0,
+                    "sha256": "",
+                    "release_notes": "AuraLink Daylight Mobile for Android (Shadowsocks + TUN + Free Region Cards).",
+                    "hosted_locally": False,
+                    "updated_at": "",
+                }
+            return {
+                "available": False,
+                "platform": "android",
+                "version": "1.0.0",
+                "download_url": "",
+                "direct_endpoint": f"{base}/api/mobile/download/apk",
+                "filename": "AuraLink-VPN-Android.apk",
+                "size_bytes": 0,
+                "sha256": "",
+                "release_notes": "",
+                "hosted_locally": False,
+                "updated_at": "",
+            }
+
+        local_path = rel.get("local_file_path") or ""
+        hosted_locally = bool(local_path and os.path.isfile(local_path))
+        raw_url = (rel.get("download_url") or "").strip()
+        if hosted_locally and (not raw_url or raw_url.startswith("/")):
+            resolved_url = f"{base}/api/mobile/download/apk"
+        elif raw_url.startswith("/"):
+            resolved_url = f"{base}{raw_url}"
+        else:
+            resolved_url = raw_url
+
+        available = bool(resolved_url) and (hosted_locally or raw_url.startswith(("http://", "https://")))
+        return {
+            "available": available,
+            "platform": rel["platform"],
+            "version": rel["version"],
+            "download_url": resolved_url,
+            "direct_endpoint": f"{base}/api/mobile/download/apk",
+            "filename": rel["filename"],
+            "size_bytes": rel["size_bytes"],
+            "sha256": rel["sha256"],
+            "release_notes": rel["release_notes"],
+            "hosted_locally": hosted_locally,
+            "updated_at": rel["updated_at"],
+        }
+
+    @app.get("/api/mobile/release")
+    def get_mobile_release(request: Request) -> Dict[str, Any]:
+        """Returns the current Mobile APK download link & metadata for the frontend."""
+        rel = db.get_mobile_release("android")
+        return _format_release_response(rel, request)
+
+    @app.get("/api/mobile/download/apk")
+    def download_mobile_apk():
+        """Streams the hosted Android APK file or redirects to the configured external APK URL."""
+        rel = db.get_mobile_release("android")
+        if rel:
+            local_path = rel.get("local_file_path") or ""
+            if local_path and os.path.isfile(local_path):
+                fname = rel.get("filename") or "AuraLink-VPN-Android.apk"
+                return FileResponse(
+                    local_path,
+                    media_type="application/vnd.android.package-archive",
+                    filename=fname,
+                )
+            ext_url = (rel.get("download_url") or "").strip()
+            if ext_url.startswith(("http://", "https://")):
+                return RedirectResponse(url=ext_url, status_code=302)
+
+        env_url = os.environ.get("AURALINK_MOBILE_APK_URL", "").strip()
+        if env_url.startswith(("http://", "https://")):
+            return RedirectResponse(url=env_url, status_code=302)
+
+        raise HTTPException(status_code=404, detail="No mobile APK release has been published yet.")
+
+    # ------------------------------------------------------------------
+    # Protected Admin Mobile APK Release Management
+    # ------------------------------------------------------------------
+    @app.get("/api/admin/mobile-release", dependencies=[Depends(require_admin)])
+    def admin_get_mobile_release(request: Request) -> Dict[str, Any]:
+        return _format_release_response(db.get_mobile_release("android"), request)
+
+    @app.put("/api/admin/mobile-release", dependencies=[Depends(require_admin)])
+    def admin_set_mobile_release(body: MobileReleaseUpdateRequest, request: Request) -> Dict[str, Any]:
+        url = body.download_url.strip()
+        if not url.startswith(("http://", "https://")):
+            raise HTTPException(status_code=400, detail="download_url must start with http:// or https://")
+
+        # Remove previously uploaded local APK if switching to an external link
+        prev = db.get_mobile_release("android")
+        if prev and prev.get("local_file_path") and os.path.isfile(prev["local_file_path"]):
+            try:
+                os.remove(prev["local_file_path"])
+            except OSError:
+                pass
+
+        saved = db.upsert_mobile_release(
+            platform="android",
+            version=body.version.strip() or "1.0.0",
+            download_url=url,
+            local_file_path="",
+            filename=body.filename.strip() or "AuraLink-VPN-Android.apk",
+            size_bytes=body.size_bytes,
+            sha256=body.sha256.strip(),
+            release_notes=body.release_notes.strip(),
+        )
+        return {"ok": True, "release": _format_release_response(saved, request)}
+
+    @app.post("/api/admin/mobile-release/upload-apk", status_code=201, dependencies=[Depends(require_admin)])
+    async def admin_upload_mobile_apk(
+        request: Request,
+        x_release_version: str = Header(default="1.0.0"),
+        x_release_notes: str = Header(default=""),
+        x_filename: str = Header(default="AuraLink-VPN-Android.apk"),
+    ) -> Dict[str, Any]:
+        """Streams an Android .apk binary directly into persistent storage (/data/releases/)."""
+        safe_name = re.sub(r"[^a-zA-Z0-9._-]", "_", (x_filename or "AuraLink-VPN-Android.apk").strip())
+        if not safe_name.lower().endswith(".apk"):
+            safe_name += ".apk"
+
+        releases_dir = os.path.join(os.path.dirname(os.path.abspath(db.db_path)), "releases")
+        os.makedirs(releases_dir, exist_ok=True)
+        tmp_path = os.path.join(releases_dir, f".{safe_name}.tmp")
+        final_path = os.path.join(releases_dir, safe_name)
+
+        hasher = hashlib.sha256()
+        total_bytes = 0
+        max_bytes = 150 * 1024 * 1024  # 150 MB safety cap
+
+        try:
+            with open(tmp_path, "wb") as out:
+                async for chunk in request.stream():
+                    if not chunk:
+                        continue
+                    total_bytes += len(chunk)
+                    if total_bytes > max_bytes:
+                        raise HTTPException(status_code=413, detail="APK exceeds 150 MB limit.")
+                    hasher.update(chunk)
+                    out.write(chunk)
+        except HTTPException:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+            raise
+        except Exception as e:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+            raise HTTPException(status_code=500, detail=f"Failed to save uploaded APK: {e}") from e
+
+        if total_bytes == 0:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+            raise HTTPException(status_code=400, detail="Uploaded APK body is empty.")
+
+        os.replace(tmp_path, final_path)
+
+        saved = db.upsert_mobile_release(
+            platform="android",
+            version=(x_release_version or "1.0.0").strip(),
+            download_url="/api/mobile/download/apk",
+            local_file_path=final_path,
+            filename=safe_name,
+            size_bytes=total_bytes,
+            sha256=hasher.hexdigest(),
+            release_notes=(x_release_notes or "").strip(),
+        )
+        return {"ok": True, "release": _format_release_response(saved, request)}
+
+    @app.delete("/api/admin/mobile-release", dependencies=[Depends(require_admin)])
+    def admin_delete_mobile_release() -> Dict[str, Any]:
+        prev = db.get_mobile_release("android")
+        if prev and prev.get("local_file_path") and os.path.isfile(prev["local_file_path"]):
+            try:
+                os.remove(prev["local_file_path"])
+            except OSError:
+                pass
+        db.delete_mobile_release("android")
+        return {"ok": True}
 
     # ------------------------------------------------------------------
     # Protected Admin Endpoints

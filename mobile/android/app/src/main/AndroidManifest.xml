@@ -8,6 +8,7 @@
 
     <application
         android:label="AuraLink VPN"
+        android:icon="@mipmap/ic_launcher"
         android:name="${applicationName}"
         android:usesCleartextTraffic="true"
         android:extractNativeLibs="true">

@@ -48,12 +48,16 @@ class _FreeKeysScreenState extends State<FreeKeysScreen> {
                 // Header
                 Row(
                   children: [
-                    const Text(
-                      'Free Regions',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: DaylightColors.textPrimary,
+                    const Flexible(
+                      child: Text(
+                        'Free Regions',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: DaylightColors.textPrimary,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -168,7 +172,7 @@ class _FreeKeysScreenState extends State<FreeKeysScreen> {
                         ? ListView(
                             children: [
                               const SizedBox(height: 60),
-                              Icon(
+                              const Icon(
                                 Icons.public_rounded,
                                 size: 48,
                                 color: DaylightColors.borderLight,

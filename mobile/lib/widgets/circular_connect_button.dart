@@ -160,7 +160,7 @@ class _OrbitalButtonPainter extends CustomPainter {
         final paint = Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2.0
-          ..color = DaylightColors.successBright.withOpacity(alpha);
+          ..color = DaylightColors.successBright.withValues(alpha: alpha);
         canvas.drawCircle(center, rippleR, paint);
       }
     }
@@ -174,7 +174,7 @@ class _OrbitalButtonPainter extends CustomPainter {
       final paint = Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = math.max(1.0, 2.8 * (1.0 - shockValue * 0.5))
-        ..color = swCol.withOpacity(alpha);
+        ..color = swCol.withValues(alpha: alpha);
       canvas.drawCircle(center, swR, paint);
     }
 
@@ -182,7 +182,7 @@ class _OrbitalButtonPainter extends CustomPainter {
     canvas.drawCircle(
       center.translate(0, 4),
       radius + 5.0,
-      Paint()..color = borderColor.withOpacity(0.14),
+      Paint()..color = borderColor.withValues(alpha: 0.14),
     );
 
     // Main frosted ceramic disc
@@ -230,7 +230,7 @@ class _OrbitalButtonPainter extends CustomPainter {
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2.0
           ..strokeCap = StrokeCap.round
-          ..color = DaylightColors.warningBright.withOpacity(0.35),
+          ..color = DaylightColors.warningBright.withValues(alpha: 0.35),
       );
     }
 
@@ -239,7 +239,7 @@ class _OrbitalButtonPainter extends CustomPainter {
     canvas.drawCircle(
       iconCenter,
       26.0,
-      Paint()..color = iconColor.withOpacity(0.11),
+      Paint()..color = iconColor.withValues(alpha: 0.11),
     );
 
     // Power icon arc + stem

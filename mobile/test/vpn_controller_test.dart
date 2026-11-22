@@ -25,6 +25,15 @@ class _MemoryStorage extends StorageService {
 
 class _StubPlatform extends VpnPlatformChannel {
   @override
+  Stream<Map<String, dynamic>> get eventStream => const Stream.empty();
+
+  @override
+  Stream<Map<String, dynamic>> get statsStream => const Stream.empty();
+
+  @override
+  Stream<String> get logStream => const Stream.empty();
+
+  @override
   Future<bool> hasNativeEngine() async => false;
 
   @override
@@ -61,6 +70,8 @@ class _StubFreeKeysService extends FreeKeysService {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test('VpnController connects, cancels mid-connect, and connects to Free Region Cards', () async {
     final ctrl = VpnController(
       storage: _MemoryStorage(),

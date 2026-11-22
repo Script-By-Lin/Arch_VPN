@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AuraLink Mobile — Free Keys Admin Panel</title>
+  <style>
+    :root {
+      --bg-main: #F1F5F9;
+      --bg-surface: #FFFFFF;
+      --bg-card: #F8FAFC;
+      --border: #E2E8F0;
+      --border-light: #CBD5E1;
+      --primary: #0284C7;
+      --primary-hover: #0369A1;
+      --primary-soft: #E0F2FE;
+      --success: #059669;
+      --success-soft: #ECFDF5;
+      --success-border: #A7F3D0;
+      --warning: #D97706;
+      --warning-soft: #FFFBEB;
+      --danger: #DC2626;
+      --danger-soft: #FEF2F2;
+      --text: #0F172A;
+      --muted: #64748B;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
+      background: var(--bg-main);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 24px 18px 48px;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .brand h1 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      background: var(--primary-soft);
+      color: #0369A1;
+      border: 1px solid #BAE6FD;
+    }
+    .pill.free {
+      background: var(--success-soft);
+      color: #047857;
+      border-color: var(--success-border);
+    }
+    .pill.draft {
+      background: var(--warning-soft);
+      color: #B45309;
+      border-color: #FDE68A;
+    }
+    .card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 20px;
+      box-shadow: 0 6px 20px rgba(15, 23, 42, 0.04);
+      margin-bottom: 18px;
+    }
+    .card h2 {
+      margin: 0 0 14px;
+      font-size: 13px;
+      font-weight: 800;
+      font-family: ui-monospace, monospace;
+      letter-spacing: 0.7px;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+    }
+    label {
+      display: block;
+      font-size: 11.5px;
+      font-weight: 700;
+      color: #334155;
+      margin-bottom: 5px;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border-light);
+      border-radius: 10px;
+      font-size: 13px;
+      background: #FFFFFF;
+      color: var(--text);
+      outline: none;
+    }
+    textarea {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      resize: vertical;
+      min-height: 74px;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.14);
+    }
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-size: 13px;
+      font-weight: 700;
+      transition: all 0.15s ease;
+    }
+    .btn-primary {
+      background: var(--primary);
+      color: #FFFFFF;
+    }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-ghost {
+      background: var(--bg-card);
+      color: #334155;
+      border: 1px solid var(--border-light);
+    }
+    .btn-ghost:hover { background: #E2E8F0; }
+    .btn-danger {
+      background: var(--danger-soft);
+      color: var(--danger);
+      border: 1px solid #FCA5A5;
+    }
+    .btn-danger:hover { background: #FEE2E2; }
+    .region-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+      gap: 14px;
+    }
+    .region-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 15px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .region-card.published { border-color: var(--success-border); background: #FFFFFF; }
+    .region-top {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .flag-box {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      background: var(--bg-main);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+    .meta {
+      font-size: 11px;
+      font-family: ui-monospace, monospace;
+      color: var(--muted);
+      word-break: break-all;
+    }
+    .actions {
+      display: flex;
+      gap: 8px;
+      margin-top: auto;
+      padding-top: 4px;
+    }
+    .actions button {
+      padding: 7px 11px;
+      font-size: 11.5px;
+    }
+    .alert {
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 12.5px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      display: none;
+    }
+    .alert.ok { display: block; background: var(--success-soft); color: #047857; border: 1px solid var(--success-border); }
+    .alert.err { display: block; background: var(--danger-soft); color: #B91C1C; border: 1px solid #FCA5A5; }
+    .hidden { display: none !important; }
+    .stats-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+    .stat-chip {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 14px;
+      font-size: 12px;
+      font-family: ui-monospace, monospace;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">
+        <h1>AuraLink Mobile Admin</h1>
+        <span class="pill">MOBILE ONLY</span>
+        <span class="pill free">FREE KEYS PUBLISHER</span>
+      </div>
+      <div id="headerActions" class="hidden" style="display:flex; gap:8px; align-items:center;">
+        <a href="/api/mobile/free-keys" target="_blank" style="text-decoration:none;">
+          <button type="button" class="btn-ghost">View Mobile JSON Feed</button>
+        </a>
+        <button type="button" class="btn-ghost" onclick="logout()">Sign Out</button>
+      </div>
+    </header>
+
+    <div id="alertBox" class="alert"></div>
+
+    <!-- Login Card -->
+    <section id="loginSection" class="card" style="max-width: 460px; margin: 48px auto;">
+      <h2>Admin Authentication</h2>
+      <p style="font-size:13px; color:var(--muted); margin-top:0;">
+        Enter your <code>AURALINK_ADMIN_TOKEN</code> to upload and publish free region VPN keys for the Flutter Mobile App.
+      </p>
+      <form id="loginForm" onsubmit="login(event)">
+        <label for="tokenInput">Admin Token</label>
+        <input id="tokenInput" type="password" placeholder="auralink-admin-..." required />
+        <div style="margin-top:14px;">
+          <button type="submit" class="btn-primary" style="width:100%;">Unlock Admin Dashboard</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Main Dashboard -->
+    <main id="dashboardSection" class="hidden">
+      <section class="card">
+        <h2>Publish New Free Region Key</h2>
+        <form id="uploadForm" onsubmit="uploadKey(event)">
+          <div class="grid-2" style="margin-bottom:12px;">
+            <div>
+              <label for="countrySelect">Region / Country</label>
+              <select id="countrySelect" onchange="onCountryChange()"></select>
+            </div>
+            <div>
+              <label for="regionInput">Region Display Name</label>
+              <input id="regionInput" type="text" placeholder="Japan" required />
+            </div>
+            <div>
+              <label for="cityInput">City (optional)</label>
+              <input id="cityInput" type="text" placeholder="Tokyo" />
+            </div>
+            <div>
+              <label for="labelInput">Card Title / Label</label>
+              <input id="labelInput" type="text" placeholder="Tokyo Free #1" />
+            </div>
+          </div>
+
+          <div style="margin-bottom:12px;">
+            <label for="rawKeyInput">Shadowsocks Key (ss://, ssconf://, https://, or JSON)</label>
+            <textarea id="rawKeyInput" placeholder="ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTpwYXNzQDEuMi4zLjQ6NDQz#TokyoFree" required></textarea>
+          </div>
+
+          <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+            <label style="display:flex; align-items:center; gap:8px; margin:0; cursor:pointer;">
+              <input id="publishCheck" type="checkbox" checked style="width:auto;" />
+              <span>Publish immediately to Mobile Free Region Cards</span>
+            </label>
+            <button type="submit" class="btn-primary">Upload &amp; Publish Free Key</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+          <h2 style="margin:0;">Mobile Free Region Cards</h2>
+          <button type="button" class="btn-ghost" onclick="loadKeys()">Refresh</button>
+        </div>
+        <div class="stats-row" id="statsRow"></div>
+        <div class="region-grid" id="keysGrid"></div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    let adminToken = sessionStorage.getItem("auralink_admin_token") || "";
+    let presets = [];
+
+    function showAlert(msg, isError = false) {
+      const box = document.getElementById("alertBox");
+      box.textContent = msg;
+      box.className = "alert " + (isError ? "err" : "ok");
+      setTimeout(() => { box.className = "alert"; }, 4500);
+    }
+
+    async function api(path, opts = {}) {
+      const headers = Object.assign({
+        "Content-Type": "application/json",
+        "X-Admin-Token": adminToken
+      }, opts.headers || {});
+      const res = await fetch(path, { ...opts, headers });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.detail || `HTTP ${res.status}`);
+      }
+      return data;
+    }
+
+    function populateCountries(list) {
+      presets = list;
+      const sel = document.getElementById("countrySelect");
+      sel.innerHTML = list.map(p => `<option value="${p.country_code}">${p.flag} ${p.region} (${p.country_code})</option>`).join("");
+      onCountryChange();
+    }
+
+    function onCountryChange() {
+      const cc = document.getElementById("countrySelect").value;
+      const match = presets.find(p => p.country_code === cc);
+      if (match) {
+        document.getElementById("regionInput").value = match.region;
+      }
+    }
+
+    async function verifyAndEnter(tok) {
+      adminToken = tok;
+      try {
+        const res = await api("/api/admin/auth/verify", { method: "POST" });
+        sessionStorage.setItem("auralink_admin_token", adminToken);
+        populateCountries(res.presets || []);
+        document.getElementById("loginSection").classList.add("hidden");
+        document.getElementById("dashboardSection").classList.remove("hidden");
+        document.getElementById("headerActions").classList.remove("hidden");
+        await loadKeys();
+      } catch (err) {
+        adminToken = "";
+        sessionStorage.removeItem("auralink_admin_token");
+        showAlert(err.message, true);
+      }
+    }
+
+    async function login(ev) {
+      ev.preventDefault();
+      const tok = document.getElementById("tokenInput").value.trim();
+      if (tok) await verifyAndEnter(tok);
+    }
+
+    function logout() {
+      adminToken = "";
+      sessionStorage.removeItem("auralink_admin_token");
+      document.getElementById("dashboardSection").classList.add("hidden");
+      document.getElementById("headerActions").classList.add("hidden");
+      document.getElementById("loginSection").classList.remove("hidden");
+    }
+
+    async function uploadKey(ev) {
+      ev.preventDefault();
+      const payload = {
+        country_code: document.getElementById("countrySelect").value,
+        region: document.getElementById("regionInput").value.trim(),
+        city: document.getElementById("cityInput").value.trim(),
+        label: document.getElementById("labelInput").value.trim() || null,
+        raw_key: document.getElementById("rawKeyInput").value.trim(),
+        is_published: document.getElementById("publishCheck").checked
+      };
+      try {
+        const res = await api("/api/admin/keys", {
+          method: "POST",
+          body: JSON.stringify(payload)
+        });
+        document.getElementById("rawKeyInput").value = "";
+        document.getElementById("labelInput").value = "";
+        showAlert(`Uploaded "${res.key.label}" (${res.key.flag} ${res.key.region})!`);
+        await loadKeys();
+      } catch (err) {
+        showAlert(err.message, true);
+      }
+    }
+
+    async function togglePublish(id, current) {
+      try {
+        await api(`/api/admin/keys/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ is_published: !current })
+        });
+        await loadKeys();
+      } catch (err) {
+        showAlert(err.message, true);
+      }
+    }
+
+    async function deleteKey(id, label) {
+      if (!confirm(`Delete free key "${label}"?`)) return;
+      try {
+        await api(`/api/admin/keys/${id}`, { method: "DELETE" });
+        showAlert(`Deleted "${label}"`);
+        await loadKeys();
+      } catch (err) {
+        showAlert(err.message, true);
+      }
+    }
+
+    function esc(s) {
+      return String(s || "").replace(/[&<>"']/g, m => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[m]));
+    }
+
+    async function loadKeys() {
+      const data = await api("/api/admin/keys");
+      const keys = data.keys || [];
+      const regions = new Set(keys.filter(k => k.is_published).map(k => k.region));
+      document.getElementById("statsRow").innerHTML = `
+        <div class="stat-chip">Total Keys: ${data.total}</div>
+        <div class="stat-chip" style="color:#047857;">Published Live: ${data.published}</div>
+        <div class="stat-chip" style="color:#0369A1;">Active Regions: ${regions.size}</div>
+      `;
+
+      const grid = document.getElementById("keysGrid");
+      if (!keys.length) {
+        grid.innerHTML = `<p style="color:var(--muted); font-size:13px;">No free keys uploaded yet. Upload your first region key above.</p>`;
+        return;
+      }
+
+      grid.innerHTML = keys.map(k => `
+        <div class="region-card ${k.is_published ? 'published' : ''}">
+          <div class="region-top">
+            <div class="flag-box">${esc(k.flag)}</div>
+            <div style="flex:1; min-width:0;">
+              <div style="font-weight:800; font-size:14px;">${esc(k.region)}${k.city ? ' • ' + esc(k.city) : ''}</div>
+              <div style="font-size:12px; color:#475569; font-weight:600;">${esc(k.label)}</div>
+            </div>
+            <span class="pill ${k.is_published ? 'free' : 'draft'}">${k.is_published ? 'FREE LIVE' : 'HIDDEN'}</span>
+          </div>
+          <div class="meta">${esc(k.server)}:${esc(k.server_port)} • ${esc(k.method)}</div>
+          <div class="actions">
+            <button class="btn-ghost" onclick="togglePublish('${esc(k.id)}', ${k.is_published})">
+              ${k.is_published ? 'Unpublish' : 'Publish Live'}
+            </button>
+            <button class="btn-danger" onclick="deleteKey('${esc(k.id)}', '${esc(k.label)}')">Delete</button>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    if (adminToken) {
+      verifyAndEnter(adminToken);
+    }
+  </script>
+</body>
+</html>

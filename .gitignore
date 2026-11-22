@@ -39,3 +39,6 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Mobile Admin Backend runtime DB & generated token
+mobile_backend/data/
+

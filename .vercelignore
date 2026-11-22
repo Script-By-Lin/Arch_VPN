@@ -5,6 +5,11 @@ gui/
 core/
 bin/
 packaging/
+mobile/
+mobile_backend/
+Dockerfile
+.dockerignore
+railway.toml
 *.sh
 sys.md
 .gemini/

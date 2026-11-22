@@ -1,0 +1,11 @@
+# Keep Railway / Docker build context minimal — include only mobile_backend/
+*
+!mobile_backend/
+!mobile_backend/**
+
+# Exclude runtime data, caches, and tests from the image
+mobile_backend/data/
+mobile_backend/__pycache__/
+mobile_backend/**/__pycache__/
+mobile_backend/*.pyc
+mobile_backend/test_backend.py

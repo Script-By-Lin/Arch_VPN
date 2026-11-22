@@ -1,0 +1,18 @@
+services:
+  auralink-mobile-admin:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: auralink-mobile-admin
+    ports:
+      - "${PORT:-8088}:${PORT:-8088}"
+    environment:
+      PORT: "${PORT:-8088}"
+      AURALINK_ADMIN_TOKEN: "${AURALINK_ADMIN_TOKEN:-change-me-local-admin-token}"
+      AURALINK_DATA_DIR: "/data"
+    volumes:
+      - auralink_free_keys_data:/data
+    restart: unless-stopped
+
+volumes:
+  auralink_free_keys_data:

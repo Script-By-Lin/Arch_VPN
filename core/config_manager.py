@@ -61,6 +61,7 @@ class ConfigManager:
                 "socks_port": 1080,
                 "tun_device": "tun0",
                 "tun_ip": "10.0.0.2/24",
+                "disable_ipv6": True,
                 "auto_reconnect": True,
                 "killswitch": True,
                 "active_profile_id": None
@@ -84,6 +85,7 @@ class ConfigManager:
             "socks_port": 1080,
             "tun_device": "tun0",
             "tun_ip": "10.0.0.2/24",
+            "disable_ipv6": True,
             "auto_reconnect": True,
             "killswitch": True,
             "active_profile_id": None

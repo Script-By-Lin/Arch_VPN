@@ -145,13 +145,30 @@ start_vpn() {
     sudo systemd-resolve -i "$TUN" --set-dns="$DNS" --set-domain="~." 2>/dev/null || true
   fi
 
-  echo "[+] Dropping default IPv6 route (killswitch)..."
-  sudo ip -6 route del default 2>/dev/null || true
+  echo "[+] Disabling network IPv6 (leak protection)..."
+  if [[ -r /proc/sys/net/ipv6/conf/all/disable_ipv6 ]]; then
+    IPV6_ALL_PREV="$(cat /proc/sys/net/ipv6/conf/all/disable_ipv6 2>/dev/null || echo 0)"
+    IPV6_DEF_PREV="$(cat /proc/sys/net/ipv6/conf/default/disable_ipv6 2>/dev/null || echo 0)"
+    IPV6_LO_PREV="$(cat /proc/sys/net/ipv6/conf/lo/disable_ipv6 2>/dev/null || echo 0)"
+    IPV6_DEV_PREV="$(cat "/proc/sys/net/ipv6/conf/$DEV/disable_ipv6" 2>/dev/null || echo 0)"
+    echo "$IPV6_ALL_PREV $IPV6_DEF_PREV $IPV6_LO_PREV $DEV $IPV6_DEV_PREV" > "$STATE_DIR/ipv6_state"
+    sudo ip -6 route del default 2>/dev/null || true
+    if command -v sysctl >/dev/null 2>&1; then
+      sudo sysctl -w \
+        net.ipv6.conf.all.disable_ipv6=1 \
+        net.ipv6.conf.default.disable_ipv6=1 \
+        "net.ipv6.conf.${DEV//./\/}.disable_ipv6=1" \
+        "net.ipv6.conf.lo.disable_ipv6=${IPV6_LO_PREV}" >/dev/null 2>&1 || true
+    fi
+  else
+    sudo ip -6 route del default 2>/dev/null || true
+  fi
 
   echo ""
   echo "════════════════════════════════════════════════════════════"
   echo " [✓] VPN Connected! System traffic routed through $TUN"
   echo "     Server: $HOST ($SERVER_IP) via physical $DEV ($GW)"
+  echo "     IPv6  : Disabled (Leak Protected)"
   echo "════════════════════════════════════════════════════════════"
 }
 
@@ -188,8 +205,21 @@ stop_vpn() {
     sudo systemd-resolve --revert -i "$TUN" 2>/dev/null || true
   fi
 
+  if [[ -f "$STATE_DIR/ipv6_state" ]]; then
+    read -r IPV6_ALL_PREV IPV6_DEF_PREV IPV6_LO_PREV IPV6_DEV IPV6_DEV_PREV < "$STATE_DIR/ipv6_state" || true
+    if command -v sysctl >/dev/null 2>&1; then
+      sudo sysctl -w \
+        "net.ipv6.conf.all.disable_ipv6=${IPV6_ALL_PREV:-0}" \
+        "net.ipv6.conf.default.disable_ipv6=${IPV6_DEF_PREV:-0}" \
+        "net.ipv6.conf.lo.disable_ipv6=${IPV6_LO_PREV:-0}" >/dev/null 2>&1 || true
+      if [[ -n "${IPV6_DEV:-}" && -e "/proc/sys/net/ipv6/conf/$IPV6_DEV/disable_ipv6" ]]; then
+        sudo sysctl -w "net.ipv6.conf.${IPV6_DEV//./\/}.disable_ipv6=${IPV6_DEV_PREV:-0}" >/dev/null 2>&1 || true
+      fi
+    fi
+  fi
+
   rm -rf "$STATE_DIR"
-  echo "[✓] VPN Disconnected. Physical routes restored."
+  echo "[✓] VPN Disconnected. Physical routes and IPv6 restored."
 }
 
 status_vpn() {
@@ -198,6 +228,17 @@ status_vpn() {
   echo ""
   echo "=== Routing Table ==="
   ip -4 route show default || true
+  echo ""
+  echo "=== IPv6 Leak Protection ==="
+  if [[ -r /proc/sys/net/ipv6/conf/all/disable_ipv6 ]]; then
+    if [[ "$(cat /proc/sys/net/ipv6/conf/all/disable_ipv6)" == "1" ]]; then
+      echo "IPv6: Disabled (Leak Protected)"
+    else
+      echo "IPv6: Enabled"
+    fi
+  else
+    echo "IPv6: Unavailable"
+  fi
   echo ""
   echo "=== Running Processes ==="
   ps aux | grep -E "sslocal|tun2socks" | grep -v grep || echo "None"

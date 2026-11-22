@@ -60,6 +60,10 @@ def cmd_connect(args, service: VPNService):
             print(f"    Profile : {BOLD}{prof.get('name')}{RESET}")
             print(f"    Server  : {prof.get('server')}:{prof.get('server_port')}")
             print(f"    TUN Dev : {data.get('tun_dev')}")
+            if data.get("ipv6_disabled"):
+                print(f"    IPv6    : {GREEN}Disabled (Leak Protected){RESET}")
+            else:
+                print(f"    IPv6    : {YELLOW}Enabled{RESET}")
         elif event_type == "error":
             print(f"{RED}{BOLD}[✗] Connection failed:{RESET} {data.get('error')}")
 
@@ -83,7 +87,7 @@ def cmd_disconnect(args, service: VPNService):
     print(f"{YELLOW}[*]{RESET} Disconnecting VPN...")
     def on_event(event_type: str, data: dict):
         if event_type == "disconnected":
-            print(f"{GREEN}{BOLD}[✓] Disconnected successfully. Default routes and DNS restored.{RESET}")
+            print(f"{GREEN}{BOLD}[✓] Disconnected successfully. Default routes, DNS, and IPv6 restored.{RESET}")
         elif event_type == "error":
             print(f"{RED}{BOLD}[✗] Disconnect error:{RESET} {data.get('error')}")
 
@@ -105,6 +109,10 @@ def cmd_status(args, service: VPNService):
             print(f"  Profile : {BOLD}{prof.get('name')}{RESET} (ID: {prof.get('id')})")
             print(f"  Server  : {prof.get('server')}:{prof.get('server_port')}")
             print(f"  Method  : {prof.get('method')}")
+
+        ipv6_off = service.network_mgr.is_ipv6_disabled()
+        ipv6_str = f"{GREEN}Disabled (Leak Protected){RESET}" if ipv6_off else f"{YELLOW}Enabled{RESET}"
+        print(f"  IPv6    : {ipv6_str}")
         
         stats = service.get_stats()
         print(f"  Uptime  : {stats['duration_str']}")

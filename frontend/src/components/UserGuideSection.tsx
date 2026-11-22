@@ -2,18 +2,18 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  BookOpen, 
-  Terminal, 
-  Monitor, 
-  KeyRound, 
-  HelpCircle, 
-  Copy, 
-  Check, 
-  Search, 
+import {
+  BookOpen,
+  Terminal,
+  Monitor,
+  KeyRound,
+  HelpCircle,
+  Copy,
+  Check,
+  Search,
   CheckCircle2,
   Zap,
-  Sliders
+  Sliders,
 } from "lucide-react";
 import { CLI_COMMANDS, FAQ_ITEMS } from "@/data/appData";
 
@@ -45,7 +45,7 @@ export default function UserGuideSection() {
       if (tab === "faq" || tab === "troubleshooting") {
         setActiveTab("faq");
       } else if (tab === "gui" || tab === "cli" || tab === "protocol" || tab === "quickstart") {
-        setActiveTab(tab as any);
+        setActiveTab(tab);
       }
     };
 
@@ -80,8 +80,7 @@ export default function UserGuideSection() {
   });
 
   return (
-    <section id="user-guide" className="py-20 md:py-28 relative bg-[#06080d]">
-      {/* Anchor targets for direct linking */}
+    <section id="user-guide" className="py-20 md:py-28 relative bg-white border-t border-slate-200/80">
       <span id="faq" className="absolute -top-24" />
       <span id="troubleshooting" className="absolute -top-24" />
       <span id="cli" className="absolute -top-24" />
@@ -90,22 +89,21 @@ export default function UserGuideSection() {
       <span id="quickstart" className="absolute -top-24" />
 
       <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
-        
         {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-12">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/25 text-cyan-300 text-xs font-semibold uppercase tracking-wider mb-3">
-            <BookOpen className="w-3.5 h-3.5 text-cyan-400" />
+          <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-sky-50 border border-sky-200 text-sky-700 text-xs font-bold uppercase tracking-wider mb-3">
+            <BookOpen className="w-3.5 h-3.5 text-sky-600" />
             <span>Complete Documentation</span>
           </div>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white tracking-tight">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight">
             AuraLink User Guide & Manual
           </h2>
-          <p className="mt-3 text-slate-300 text-sm sm:text-base">
-            Master both the modern PyQt5 desktop GUI and headless CLI scripting workflows.
+          <p className="mt-3 text-slate-600 text-sm sm:text-base">
+            Master both the modern Daylight PyQt5 desktop GUI and headless CLI scripting workflows.
           </p>
         </div>
 
-        {/* Tab Navigation Navigation Bar */}
+        {/* Animated Tab Navigation */}
         <div className="flex items-center justify-center gap-2 mb-10 overflow-x-auto pb-2 scrollbar-none">
           {[
             { id: "quickstart" as const, label: "Quick Start", icon: Zap },
@@ -120,13 +118,13 @@ export default function UserGuideSection() {
                 key={tab.id}
                 type="button"
                 onClick={() => handleTabClick(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                className={`relative flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap border ${
                   isActive
-                    ? "bg-gradient-to-r from-cyan-500/20 to-purple-500/20 text-cyan-200 border border-cyan-400/50 shadow-lg shadow-cyan-950/40"
-                    : "bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-white/[0.06]"
+                    ? "bg-sky-600 text-white border-sky-600 shadow-md shadow-sky-600/20"
+                    : "bg-slate-50 text-slate-600 hover:text-sky-700 hover:bg-sky-50 border-slate-200"
                 }`}
               >
-                <tab.icon className={`w-4 h-4 ${isActive ? "text-cyan-400" : "text-slate-500"}`} />
+                <tab.icon className={`w-4 h-4 ${isActive ? "text-white" : "text-slate-400"}`} />
                 <span>{tab.label}</span>
               </button>
             );
@@ -134,9 +132,8 @@ export default function UserGuideSection() {
         </div>
 
         {/* Tab Content Panes */}
-        <div className="rounded-3xl bg-[#0c101a] border border-white/[0.08] p-6 sm:p-10 shadow-2xl">
+        <div className="max-w-6xl mx-auto rounded-3xl bg-slate-50/70 border border-slate-200 p-6 sm:p-10 shadow-sm">
           <AnimatePresence mode="wait">
-            
             {/* TAB 1: QUICK START */}
             {activeTab === "quickstart" && (
               <motion.div
@@ -144,75 +141,72 @@ export default function UserGuideSection() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.25 }}
+                transition={{ duration: 0.22 }}
                 className="space-y-8"
               >
                 <div>
-                  <h3 className="text-2xl font-bold text-white mb-2">Getting Started with AuraLink</h3>
-                  <p className="text-slate-300 text-sm">
+                  <h3 className="text-2xl font-extrabold text-slate-900 mb-2">Getting Started with AuraLink</h3>
+                  <p className="text-slate-600 text-sm">
                     Follow this 3-step guide to get AuraLink running on your Linux desktop or server.
                   </p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {/* Step 1 */}
-                  <div className="p-5 rounded-2xl bg-black/40 border border-white/[0.06] flex flex-col justify-between">
+                  <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between">
                     <div>
-                      <div className="w-8 h-8 rounded-lg bg-cyan-500/20 text-cyan-300 font-mono font-bold flex items-center justify-center text-sm mb-4 border border-cyan-500/30">
+                      <div className="w-8 h-8 rounded-lg bg-sky-50 text-sky-700 font-mono font-bold flex items-center justify-center text-sm mb-4 border border-sky-200">
                         01
                       </div>
-                      <h4 className="text-base font-bold text-white mb-2">Install AuraLink</h4>
-                      <p className="text-xs text-slate-400 leading-relaxed mb-4">
+                      <h4 className="text-base font-bold text-slate-900 mb-2">Install AuraLink</h4>
+                      <p className="text-xs text-slate-600 leading-relaxed mb-4">
                         Run the 1-command universal installer which configures dependencies, desktop shortcuts, and sudoers rules.
                       </p>
                     </div>
-                    <div className="p-3 rounded-xl bg-black font-mono text-[11px] text-cyan-300 overflow-x-auto border border-white/[0.04]">
+                    <div className="p-3 rounded-xl bg-slate-900 font-mono text-[11px] text-sky-300 overflow-x-auto">
                       <code>curl -fsSL https://.../install.sh | sudo bash</code>
                     </div>
                   </div>
 
-                  {/* Step 2 */}
-                  <div className="p-5 rounded-2xl bg-black/40 border border-white/[0.06] flex flex-col justify-between">
+                  <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between">
                     <div>
-                      <div className="w-8 h-8 rounded-lg bg-purple-500/20 text-purple-300 font-mono font-bold flex items-center justify-center text-sm mb-4 border border-purple-500/30">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 font-mono font-bold flex items-center justify-center text-sm mb-4 border border-indigo-200">
                         02
                       </div>
-                      <h4 className="text-base font-bold text-white mb-2">Import Your Key</h4>
-                      <p className="text-xs text-slate-400 leading-relaxed mb-4">
-                        Import an <code className="text-cyan-300 font-mono">ssconf://</code> subscription link via GUI clipboard paste or CLI.
+                      <h4 className="text-base font-bold text-slate-900 mb-2">Import Your Key</h4>
+                      <p className="text-xs text-slate-600 leading-relaxed mb-4">
+                        Import an <code className="text-sky-700 font-mono font-semibold">ssconf://</code> subscription link via GUI or CLI.
                       </p>
                     </div>
-                    <div className="p-3 rounded-xl bg-black font-mono text-[11px] text-purple-300 overflow-x-auto border border-white/[0.04]">
+                    <div className="p-3 rounded-xl bg-slate-900 font-mono text-[11px] text-indigo-300 overflow-x-auto">
                       <code>auralink import &quot;ssconf://...&quot;</code>
                     </div>
                   </div>
 
-                  {/* Step 3 */}
-                  <div className="p-5 rounded-2xl bg-black/40 border border-white/[0.06] flex flex-col justify-between">
+                  <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between">
                     <div>
-                      <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-300 font-mono font-bold flex items-center justify-center text-sm mb-4 border border-emerald-500/30">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 font-mono font-bold flex items-center justify-center text-sm mb-4 border border-emerald-200">
                         03
                       </div>
-                      <h4 className="text-base font-bold text-white mb-2">Connect & Switch</h4>
-                      <p className="text-xs text-slate-400 leading-relaxed mb-4">
-                        Connect via CLI/GUI or switch active servers seamlessly by Profile ID with <code className="text-cyan-300 font-mono">auralink switch &lt;ID&gt;</code>.
+                      <h4 className="text-base font-bold text-slate-900 mb-2">Connect & Switch</h4>
+                      <p className="text-xs text-slate-600 leading-relaxed mb-4">
+                        Connect via CLI/GUI or switch active servers seamlessly by Profile ID with{" "}
+                        <code className="text-sky-700 font-mono font-semibold">auralink switch &lt;ID&gt;</code>.
                       </p>
                     </div>
-                    <div className="p-3 rounded-xl bg-black font-mono text-[11px] text-emerald-300 overflow-x-auto border border-white/[0.04]">
+                    <div className="p-3 rounded-xl bg-slate-900 font-mono text-[11px] text-emerald-300 overflow-x-auto">
                       <code>auralink switch a1b2c3d4</code>
                     </div>
                   </div>
                 </div>
 
-                {/* Uninstallation Callout */}
-                <div className="p-5 rounded-2xl bg-slate-900/50 border border-white/[0.06] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="p-5 rounded-2xl bg-white border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div>
-                    <h5 className="text-sm font-bold text-slate-200">Clean Uninstallation</h5>
-                    {/* <p className="text-xs text-slate-400 mt-0.5">
-                      To completely remove all binaries, systemd rules, and sudoers helper files:
-                    </p> */}
+                    <h5 className="text-sm font-bold text-slate-900">Clean Uninstallation</h5>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Safely disconnects active tunnels, restores routing/IPv6/DNS, and cleans system files (add <code className="font-mono">--purge</code> to remove user profiles).
+                    </p>
                   </div>
-                  <div className="flex items-center gap-2 font-mono text-xs text-rose-300 bg-black/60 px-3 py-2 rounded-xl border border-rose-500/20">
+                  <div className="flex items-center gap-2 font-mono text-xs text-rose-700 bg-rose-50 px-3.5 py-2 rounded-xl border border-rose-200 shrink-0">
                     <code>curl -fsSL https://.../uninstall.sh | sudo bash</code>
                   </div>
                 </div>
@@ -226,85 +220,68 @@ export default function UserGuideSection() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.25 }}
+                transition={{ duration: 0.22 }}
                 className="space-y-8"
               >
                 <div>
-                  <h3 className="text-2xl font-bold text-white mb-2">PyQt5 Dark Mode Desktop GUI</h3>
-                  <p className="text-slate-300 text-sm">
-                    AuraLink features a sleek, hardware-accelerated desktop interface built for Linux desktops (GNOME, KDE Plasma, XFCE, Sway, Hyprland).
+                  <h3 className="text-2xl font-extrabold text-slate-900 mb-2">PyQt5 Daylight Desktop GUI</h3>
+                  <p className="text-slate-600 text-sm">
+                    AuraLink features a bright, responsive light-mode desktop interface built for Linux desktops (GNOME, KDE Plasma, XFCE, Sway, Hyprland).
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div className="p-4 rounded-xl bg-black/40 border border-white/[0.06]">
-                      <h4 className="text-sm font-bold text-cyan-300 flex items-center gap-2">
-                        <Sliders className="w-4 h-4" />
-                        <span>Glowing Animated Connect Button</span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {[
+                    {
+                      icon: Sliders,
+                      color: "text-sky-700",
+                      title: "Animated Orbital Connect Hub",
+                      desc: "Frosted circular switch with smooth hover interpolation, rotating orbital handshake arc, and concentric ripple rings while connected.",
+                    },
+                    {
+                      icon: Zap,
+                      color: "text-emerald-700",
+                      title: "Live Speed Sparklines & Telemetry",
+                      desc: "Direct kernel polling of /proc/net/dev renders real-time Download/Upload speed readouts with animated throughput waveforms.",
+                    },
+                    {
+                      icon: BookOpen,
+                      color: "text-indigo-700",
+                      title: "Interactive Live Tunnel Model",
+                      desc: "Inspect live packet flow across Apps, tun0, sslocal, and remote VPN server right inside the desktop window.",
+                    },
+                    {
+                      icon: Monitor,
+                      color: "text-amber-700",
+                      title: "System Tray Integration",
+                      desc: "Minimizes cleanly to your system status bar tray with quick connect/disconnect controls.",
+                    },
+                    {
+                      icon: Terminal,
+                      color: "text-blue-700",
+                      title: "Real-Time Debug Log Console",
+                      desc: "Built-in live log tail streaming events from tun2socks, sslocal, and kernel routing/IPv6 controls.",
+                    },
+                    {
+                      icon: CheckCircle2,
+                      color: "text-teal-700",
+                      title: "DNS Preset & IPv6 Leak Guard",
+                      desc: "Switch between Cloudflare, Google, Quad9, and AdGuard live while IPv6 is automatically disabled during VPN sessions.",
+                    },
+                  ].map((item) => (
+                    <div key={item.title} className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs">
+                      <h4 className={`text-sm font-bold ${item.color} flex items-center gap-2`}>
+                        <item.icon className="w-4 h-4" />
+                        <span>{item.title}</span>
                       </h4>
-                      <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
-                        Features a central glowing circular switch that dynamically animates green when connected and amber during tunnel route configuration.
-                      </p>
+                      <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">{item.desc}</p>
                     </div>
-
-                    <div className="p-4 rounded-xl bg-black/40 border border-white/[0.06]">
-                      <h4 className="text-sm font-bold text-emerald-300 flex items-center gap-2">
-                        <Zap className="w-4 h-4" />
-                        <span>Real-Time Speed & Telemetry Meters</span>
-                      </h4>
-                      <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
-                        Direct kernel polling of <code className="font-mono text-cyan-300">/proc/net/dev</code> provides instantaneous Download and Upload speedometers with cumulative session bandwidth accounting.
-                      </p>
-                    </div>
-
-                    <div className="p-4 rounded-xl bg-black/40 border border-white/[0.06]">
-                      <h4 className="text-sm font-bold text-purple-300 flex items-center gap-2">
-                        <BookOpen className="w-4 h-4" />
-                        <span>Clipboard Auto-Detection</span>
-                      </h4>
-                      <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
-                        Copying any <code className="font-mono text-cyan-300">ssconf://</code> or Shadowsocks URL triggers an instant import prompt without manual copy-pasting.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="p-4 rounded-xl bg-black/40 border border-white/[0.06]">
-                      <h4 className="text-sm font-bold text-amber-300 flex items-center gap-2">
-                        <Monitor className="w-4 h-4" />
-                        <span>System Tray Minimization</span>
-                      </h4>
-                      <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
-                        Closes seamlessly to the system status bar tray. Right-click the tray icon to quickly toggle connection, test latency, or quit.
-                      </p>
-                    </div>
-
-                    <div className="p-4 rounded-xl bg-black/40 border border-white/[0.06]">
-                      <h4 className="text-sm font-bold text-blue-300 flex items-center gap-2">
-                        <Terminal className="w-4 h-4" />
-                        <span>Real-Time Debug Log Console</span>
-                      </h4>
-                      <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
-                        Built-in log terminal displaying real-time outputs from <code className="font-mono text-cyan-300">tun2socks</code>, <code className="font-mono text-cyan-300">sslocal</code>, and <code className="font-mono text-cyan-300">vpn-core-helper</code> for easy debugging.
-                      </p>
-                    </div>
-
-                    <div className="p-4 rounded-xl bg-black/40 border border-white/[0.06]">
-                      <h4 className="text-sm font-bold text-teal-300 flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>DNS Upstream Preset Selector</span>
-                      </h4>
-                      <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
-                        Switch between Cloudflare (1.1.1.1), Google (8.8.8.8), Quad9 (9.9.9.9), or AdGuard (94.140.14.14) with a single click.
-                      </p>
-                    </div>
-                  </div>
+                  ))}
                 </div>
 
-                <div className="p-4 rounded-2xl bg-cyan-950/20 border border-cyan-500/20 text-xs text-slate-300 flex items-center justify-between">
-                  <span>To launch the desktop GUI from your terminal, simply execute:</span>
-                  <code className="font-mono text-cyan-300 bg-black/60 px-3 py-1.5 rounded-lg border border-cyan-500/30">
+                <div className="p-4 rounded-2xl bg-sky-50 border border-sky-200 text-xs text-slate-700 flex flex-wrap items-center justify-between gap-3">
+                  <span className="font-medium">To launch the desktop GUI from your terminal, execute:</span>
+                  <code className="font-mono font-bold text-sky-800 bg-white px-3.5 py-1.5 rounded-lg border border-sky-200">
                     auralink gui
                   </code>
                 </div>
@@ -318,18 +295,17 @@ export default function UserGuideSection() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.25 }}
+                transition={{ duration: 0.22 }}
                 className="space-y-6"
               >
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div>
-                    <h3 className="text-2xl font-bold text-white mb-1">CLI Command Playground</h3>
-                    <p className="text-slate-300 text-xs sm:text-sm">
+                    <h3 className="text-2xl font-extrabold text-slate-900 mb-1">CLI Command Reference</h3>
+                    <p className="text-slate-600 text-xs sm:text-sm">
                       Automate VPN connections, test servers, and stream logs directly in headless environments.
                     </p>
                   </div>
 
-                  {/* Search bar */}
                   <div className="relative w-full sm:w-64">
                     <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
@@ -337,21 +313,20 @@ export default function UserGuideSection() {
                       placeholder="Search command..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full bg-black/60 border border-white/10 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-400 font-mono"
+                      className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-sky-500 font-mono"
                     />
                   </div>
                 </div>
 
-                {/* Category Filters */}
                 <div className="flex items-center gap-2 overflow-x-auto pb-1">
                   {["All", "Connection", "Subscription", "Diagnostics", "System"].map((cat) => (
                     <button
                       key={cat}
                       onClick={() => setCliFilter(cat)}
-                      className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer border ${
                         cliFilter === cat
-                          ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
-                          : "bg-slate-900/60 text-slate-400 hover:text-slate-200 border border-white/[0.04]"
+                          ? "bg-sky-600 text-white border-sky-600"
+                          : "bg-white text-slate-600 hover:text-sky-700 border-slate-200"
                       }`}
                     >
                       {cat}
@@ -359,31 +334,28 @@ export default function UserGuideSection() {
                   ))}
                 </div>
 
-                {/* Commands Accordion Grid */}
                 <div className="space-y-4">
                   {filteredCommands.map((cmd, idx) => (
                     <div
                       key={cmd.command}
-                      className="p-5 rounded-2xl bg-black/40 border border-white/[0.08] hover:border-cyan-500/30 transition-all space-y-3"
+                      className="p-5 rounded-2xl bg-white border border-slate-200 hover:border-sky-300 transition-all space-y-3 shadow-xs"
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <div className="flex items-center gap-2.5">
-                          <span className="font-mono text-sm font-bold text-cyan-300">
-                            {cmd.command}
-                          </span>
-                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/[0.06] text-slate-400">
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                          <span className="font-mono text-sm font-bold text-sky-700">{cmd.command}</span>
+                          <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
                             {cmd.category}
                           </span>
                         </div>
 
                         <button
                           onClick={() => handleCopy(cmd.example, idx)}
-                          className="self-start sm:self-auto flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 text-xs text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
+                          className="self-start sm:self-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 text-xs font-semibold text-slate-700 hover:text-sky-700 hover:bg-sky-50 border border-slate-200 transition-colors cursor-pointer"
                         >
                           {copiedIndex === idx ? (
                             <>
-                              <Check className="w-3.5 h-3.5 text-emerald-400" />
-                              <span className="text-emerald-400 text-[11px]">Copied</span>
+                              <Check className="w-3.5 h-3.5 text-emerald-600" />
+                              <span className="text-emerald-700 text-[11px]">Copied</span>
                             </>
                           ) : (
                             <>
@@ -394,30 +366,26 @@ export default function UserGuideSection() {
                         </button>
                       </div>
 
-                      <p className="text-xs text-slate-400">{cmd.summary}</p>
+                      <p className="text-xs text-slate-600">{cmd.summary}</p>
 
-                      {/* Options if available */}
                       {cmd.options && (
                         <div className="space-y-1 pt-1">
-                          <span className="text-[11px] font-semibold text-slate-400">Flags & Options:</span>
+                          <span className="text-[11px] font-bold text-slate-700">Flags & Options:</span>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                             {cmd.options.map((opt) => (
-                              <div key={opt.flag} className="text-[11px] font-mono text-slate-400">
-                                <span className="text-purple-300 font-semibold">{opt.flag}</span>: {opt.description}
+                              <div key={opt.flag} className="text-[11px] font-mono text-slate-600">
+                                <span className="text-indigo-700 font-bold">{opt.flag}</span>: {opt.description}
                               </div>
                             ))}
                           </div>
                         </div>
                       )}
 
-                      {/* Output preview */}
-                      <div className="mt-2 p-3 rounded-xl bg-black/80 border border-white/[0.04] font-mono text-[11px] text-slate-300 overflow-x-auto">
+                      <div className="mt-2 p-3.5 rounded-xl bg-slate-900 font-mono text-[11px] text-slate-200 overflow-x-auto">
                         <div className="text-[10px] text-slate-400 uppercase tracking-wider mb-1 font-semibold">
                           Expected Terminal Output:
                         </div>
-                        <pre className="text-emerald-400/90 whitespace-pre-wrap leading-relaxed">
-                          {cmd.output}
-                        </pre>
+                        <pre className="text-emerald-300 whitespace-pre-wrap leading-relaxed">{cmd.output}</pre>
                       </div>
                     </div>
                   ))}
@@ -432,66 +400,64 @@ export default function UserGuideSection() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.25 }}
+                transition={{ duration: 0.22 }}
                 className="space-y-6"
               >
                 <div>
-                  <h3 className="text-2xl font-bold text-white mb-2">ssconf:// Protocol Specification</h3>
-                  <p className="text-slate-300 text-sm">
+                  <h3 className="text-2xl font-extrabold text-slate-900 mb-2">ssconf:// Protocol Specification</h3>
+                  <p className="text-slate-600 text-sm">
                     How AuraLink decodes, decrypts, and maps dynamic subscription endpoints.
                   </p>
                 </div>
 
-                <div className="p-4 rounded-xl bg-black/60 border border-cyan-500/20 font-mono text-xs text-cyan-300 select-all">
+                <div className="p-4 rounded-xl bg-slate-900 font-mono text-xs text-sky-300 select-all">
                   ssconf://..../api/v1/client/subscribe?token=xyz...#Profile-Label
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="p-5 rounded-2xl bg-black/40 border border-white/[0.06] space-y-3">
-                    <h4 className="text-sm font-bold text-white">1. URL Fetch & Verification</h4>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      AuraLink strips the <code className="text-cyan-300 font-mono">ssconf://</code> scheme to <code className="text-cyan-300 font-mono">https://</code>, requests the subscription payload over TLS, and checks HTTP response headers for account quota warnings or server package expirations.
-                    </p>
-                  </div>
-
-                  <div className="p-5 rounded-2xl bg-black/40 border border-white/[0.06] space-y-3">
-                    <h4 className="text-sm font-bold text-white">2. Base64 Shadowsocks Decryption</h4>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      The payload is unpacked into standard Shadowsocks client configurations, extracting the remote host, remote port, AEAD cipher (<code className="text-purple-300 font-mono">chacha20-ietf-poly1305</code>), password, and custom packet prefix headers.
-                    </p>
-                  </div>
-
-                  <div className="p-5 rounded-2xl bg-black/40 border border-white/[0.06] space-y-3">
-                    <h4 className="text-sm font-bold text-white">3. Local Port & Profile Binding</h4>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      Injects local SOCKS5 listening address (<code className="text-cyan-300 font-mono">127.0.0.1:1080</code>) and saves the active node profile to <code className="text-slate-300 font-mono">~/.config/auralink/profiles.json</code>.
-                    </p>
-                  </div>
-
-                  <div className="p-5 rounded-2xl bg-black/40 border border-white/[0.06] space-y-3">
-                    <h4 className="text-sm font-bold text-white">4. Packet Prefix & TLS Disguise</h4>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      If the subscription defines a prefix header (e.g. <code className="text-emerald-300 font-mono">\x16\x03\x01</code> for TLS Client Hello), AuraLink injects it into <code className="text-slate-300 font-mono">sslocal</code> to disguise proxy packets as standard HTTPS traffic.
-                    </p>
-                  </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {[
+                    {
+                      title: "1. URL Fetch & Verification",
+                      body: "Strips ssconf:// to https://, requests the subscription payload over TLS, and checks for provider quota or expiration error payloads.",
+                    },
+                    {
+                      title: "2. Shadowsocks Config Parsing",
+                      body: "Extracts server endpoint, port, AEAD cipher (chacha20-ietf-poly1305, aes-256-gcm), password, and optional anti-DPI prefix headers.",
+                    },
+                    {
+                      title: "3. Local Port & Profile Binding",
+                      body: "Injects local SOCKS5 address (127.0.0.1:1080) and stores the profile in ~/.config/auralink/profiles.json.",
+                    },
+                    {
+                      title: "4. Packet Prefix & TLS Disguise",
+                      body: "Passes configured TLS Client Hello prefix bytes directly to sslocal so outbound proxy traffic resembles standard HTTPS handshakes.",
+                    },
+                  ].map((card) => (
+                    <div key={card.title} className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-2">
+                      <h4 className="text-sm font-bold text-slate-900">{card.title}</h4>
+                      <p className="text-xs text-slate-600 leading-relaxed">{card.body}</p>
+                    </div>
+                  ))}
                 </div>
               </motion.div>
             )}
 
-            {/* TAB 5: TROUBLESHOOTING & FAQ */}
+            {/* TAB 5: FAQ */}
             {activeTab === "faq" && (
               <motion.div
                 key="faq"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.25 }}
+                transition={{ duration: 0.22 }}
                 className="space-y-6"
               >
                 <div>
-                  <h3 className="text-2xl font-bold text-white mb-2">Frequently Asked Questions & Troubleshooting</h3>
-                  <p className="text-slate-300 text-sm">
-                    Common issues, systemd-resolved DNS diagnostics, and Linux routing questions.
+                  <h3 className="text-2xl font-extrabold text-slate-900 mb-2">
+                    Frequently Asked Questions & Troubleshooting
+                  </h3>
+                  <p className="text-slate-600 text-sm">
+                    Common issues, systemd-resolved DNS diagnostics, IPv6 leak protection, and Linux routing questions.
                   </p>
                 </div>
 
@@ -499,23 +465,19 @@ export default function UserGuideSection() {
                   {FAQ_ITEMS.map((faq) => (
                     <div
                       key={faq.question}
-                      className="p-5 rounded-2xl bg-black/40 border border-white/[0.08] space-y-3"
+                      className="p-5 rounded-2xl bg-white border border-slate-200 space-y-3 shadow-xs"
                     >
                       <div className="flex items-start justify-between gap-3">
-                        <h4 className="text-sm sm:text-base font-bold text-white">
-                          {faq.question}
-                        </h4>
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
+                        <h4 className="text-sm sm:text-base font-bold text-slate-900">{faq.question}</h4>
+                        <span className="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-200 shrink-0">
                           {faq.category}
                         </span>
                       </div>
 
-                      <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                        {faq.answer}
-                      </p>
+                      <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">{faq.answer}</p>
 
                       {faq.code && (
-                        <div className="p-3 rounded-xl bg-black/80 border border-white/[0.06] font-mono text-[11px] text-emerald-300 overflow-x-auto select-all">
+                        <div className="p-3.5 rounded-xl bg-slate-900 font-mono text-[11px] text-emerald-300 overflow-x-auto select-all">
                           <pre>{faq.code}</pre>
                         </div>
                       )}
@@ -524,10 +486,8 @@ export default function UserGuideSection() {
                 </div>
               </motion.div>
             )}
-
           </AnimatePresence>
         </div>
-
       </div>
     </section>
   );

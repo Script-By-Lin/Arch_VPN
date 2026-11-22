@@ -6,24 +6,43 @@ pkgdesc="Cross-Distro Shadowsocks & tun2socks VPN Client for Linux"
 arch=('x86_64' 'aarch64')
 url="https://github.com/Script-By-Lin/Arch_VPN"
 license=('GPL3')
-depends=('python' 'python-pyqt5' 'shadowsocks-rust' 'tun2socks' 'iproute2' 'curl' 'jq')
-optdepends=('systemd-resolvconf: for systemd DNS routing')
+depends=('python' 'python-pyqt5' 'shadowsocks-rust' 'iproute2' 'curl' 'jq')
+optdepends=(
+    'tun2socks: TUN-to-SOCKS5 userspace bridge (AUR or /usr/local/bin/tun2socks)'
+    'systemd-resolvconf: for systemd-resolved DNS routing'
+    'openresolv: alternative DNS routing backend'
+)
+source=("auralink-src::git+https://github.com/Script-By-Lin/Arch_VPN.git")
+sha256sums=('SKIP')
 
 package() {
-    install -d "$pkgdir/opt/auralink"
-    cp -r "$srcdir/core" "$srcdir/gui" "$srcdir/cli" "$srcdir/bin" "$pkgdir/opt/auralink/"
+    local src_root="$srcdir/auralink-src"
+    if [ ! -d "$src_root/core" ] && [ -d "$startdir/../core" ]; then
+        src_root="$startdir/.."
+    fi
 
-    install -d "$pkgdir/usr/local/bin"
+    install -d "$pkgdir/opt/auralink"
+    cp -r "$src_root/core" "$src_root/gui" "$src_root/cli" "$src_root/bin" "$pkgdir/opt/auralink/"
+    chmod 0755 "$pkgdir/opt/auralink/bin/auralink" "$pkgdir/opt/auralink/bin/vpn-core-helper" "$pkgdir/opt/auralink/cli/main.py" "$pkgdir/opt/auralink/gui/app.py"
+
+    install -d "$pkgdir/usr/local/bin" "$pkgdir/usr/bin"
     ln -sf "/opt/auralink/bin/auralink" "$pkgdir/usr/local/bin/auralink"
     ln -sf "/opt/auralink/bin/auralink" "$pkgdir/usr/local/bin/auralink-vpn"
     ln -sf "/opt/auralink/bin/vpn-core-helper" "$pkgdir/usr/local/bin/vpn-core-helper"
+    ln -sf "/opt/auralink/bin/auralink" "$pkgdir/usr/bin/auralink"
 
-    install -Dm644 "$srcdir/packaging/auralink.desktop" "$pkgdir/usr/share/applications/auralink.desktop"
-    install -Dm644 "$srcdir/gui/assets/icon.png" "$pkgdir/usr/share/pixmaps/auralink.png"
-    install -Dm644 "$srcdir/gui/assets/icon.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/auralink.svg"
+    install -Dm644 "$src_root/packaging/auralink.desktop" "$pkgdir/usr/share/applications/auralink.desktop"
+    install -Dm644 "$src_root/gui/assets/icon.png" "$pkgdir/usr/share/pixmaps/auralink.png"
+    install -Dm644 "$src_root/gui/assets/icon.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/auralink.svg"
     for s in 16 22 24 32 48 64 128 256 512; do
-        if [ -f "$srcdir/gui/assets/icons/auralink_${s}x${s}.png" ]; then
-            install -Dm644 "$srcdir/gui/assets/icons/auralink_${s}x${s}.png" "$pkgdir/usr/share/icons/hicolor/${s}x${s}/apps/auralink.png"
+        if [ -f "$src_root/gui/assets/icons/auralink_${s}x${s}.png" ]; then
+            install -Dm644 "$src_root/gui/assets/icons/auralink_${s}x${s}.png" "$pkgdir/usr/share/icons/hicolor/${s}x${s}/apps/auralink.png"
         fi
     done
+
+    install -dm750 "$pkgdir/etc/sudoers.d"
+    cat << 'SUDO_EOF' > "$pkgdir/etc/sudoers.d/auralink"
+ALL ALL=(ALL) NOPASSWD: /usr/local/bin/vpn-core-helper, /usr/bin/tun2socks, /usr/local/bin/tun2socks, /usr/bin/ip, /usr/sbin/ip, /usr/bin/sysctl, /usr/sbin/sysctl, /usr/bin/resolvectl, /usr/bin/pkill, /usr/bin/kill
+SUDO_EOF
+    chmod 0440 "$pkgdir/etc/sudoers.d/auralink"
 }

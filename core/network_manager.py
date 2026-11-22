@@ -12,7 +12,10 @@ import re
 import socket
 import subprocess
 import shutil
-from typing import Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
+
+
+IPV6_CONF_DIR = "/proc/sys/net/ipv6/conf"
 
 
 class NetworkError(Exception):
@@ -161,21 +164,209 @@ class NetworkManager:
         self.run_cmd(["ip", "route", "replace", f"{server_ip}/32", "via", gateway_ip, "dev", physical_dev])
         # 2. Set default route to TUN interface
         self.run_cmd(["ip", "route", "replace", "default", "dev", tun_name])
-        # 3. Disable IPv6 default route to prevent leaks
+        # 3. Drop default IPv6 route to prevent leaks
         self.run_cmd(["ip", "-6", "route", "del", "default"], check=False)
+
+    def _select_helper(self, required_action: Optional[str] = None) -> Optional[str]:
+        """Selects vpn-core-helper, preferring /usr/local/bin/vpn-core-helper for sudoers match."""
+        candidates = []
+        installed_helper = "/usr/local/bin/vpn-core-helper"
+        if os.path.exists(installed_helper):
+            candidates.append(installed_helper)
+        if self.helper_path and os.path.exists(self.helper_path) and self.helper_path not in candidates:
+            candidates.append(self.helper_path)
+
+        for path in candidates:
+            if not required_action:
+                return path
+            try:
+                with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                    if f"{required_action})" in f.read():
+                        return path
+            except Exception:
+                continue
+        return None
+
+    @staticmethod
+    def _read_ipv6_sysctl(iface: str) -> Optional[int]:
+        """Reads /proc/sys/net/ipv6/conf/<iface>/disable_ipv6 as 0 or 1."""
+        path = os.path.join(IPV6_CONF_DIR, iface, "disable_ipv6")
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                val = int(f.read().strip())
+                return 1 if val else 0
+        except Exception:
+            return None
+
+    def get_ipv6_state(self, physical_dev: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Snapshots current kernel IPv6 disable_ipv6 sysctl state before disabling IPv6,
+        so it can be restored accurately on VPN disconnect.
+        """
+        if not os.path.isdir(IPV6_CONF_DIR):
+            return {"available": False, "all": 0, "default": 0, "interfaces": {}}
+
+        all_val = self._read_ipv6_sysctl("all")
+        default_val = self._read_ipv6_sysctl("default")
+        interfaces: Dict[str, int] = {}
+
+        try:
+            for entry in sorted(os.listdir(IPV6_CONF_DIR)):
+                if entry in ("all", "default"):
+                    continue
+                val = self._read_ipv6_sysctl(entry)
+                if val is not None:
+                    interfaces[entry] = val
+        except Exception:
+            pass
+
+        if physical_dev and physical_dev not in interfaces:
+            val = self._read_ipv6_sysctl(physical_dev)
+            if val is not None:
+                interfaces[physical_dev] = val
+
+        return {
+            "available": all_val is not None,
+            "all": all_val if all_val is not None else 0,
+            "default": default_val if default_val is not None else 0,
+            "interfaces": interfaces,
+        }
+
+    def is_ipv6_disabled(self, physical_dev: Optional[str] = None) -> bool:
+        """Returns True if IPv6 is disabled globally (and on physical_dev when provided)."""
+        if not os.path.isdir(IPV6_CONF_DIR):
+            return True
+        all_val = self._read_ipv6_sysctl("all")
+        if all_val != 1:
+            return False
+        if physical_dev:
+            dev_val = self._read_ipv6_sysctl(physical_dev)
+            if dev_val is not None and dev_val != 1:
+                return False
+        return True
+
+    def disable_ipv6(
+        self,
+        physical_dev: Optional[str] = None,
+        prev_state: Optional[Dict[str, Any]] = None,
+    ) -> bool:
+        """
+        Disables IPv6 on all network interfaces via kernel sysctl while preserving
+        loopback (lo) if it was enabled, preventing IPv6 traffic & RA/DHCPv6 leaks.
+        """
+        if not os.path.isdir(IPV6_CONF_DIR):
+            return True
+
+        lo_val = 0
+        if prev_state and isinstance(prev_state.get("interfaces"), dict):
+            lo_val = 1 if prev_state["interfaces"].get("lo", 0) else 0
+        else:
+            cur_lo = self._read_ipv6_sysctl("lo")
+            if cur_lo is not None:
+                lo_val = cur_lo
+
+        # 1. Drop any active IPv6 default route immediately
+        self.run_cmd(["ip", "-6", "route", "del", "default"], check=False)
+
+        # 2. Prefer vpn-core-helper (already authorized via sudoers)
+        helper = self._select_helper("ipv6-disable")
+        if helper:
+            args = [helper, "ipv6-disable", str(lo_val)]
+            if physical_dev and re.match(r"^[a-zA-Z0-9_.:-]+$", physical_dev):
+                args.append(physical_dev)
+            res = self.run_cmd(args, check=False)
+            if res.returncode == 0 and self.is_ipv6_disabled(physical_dev=physical_dev):
+                return True
+
+        # 3. Fallback to sysctl directly
+        sysctl_bin = shutil.which("sysctl")
+        if sysctl_bin:
+            params: List[str] = [
+                "net.ipv6.conf.all.disable_ipv6=1",
+                "net.ipv6.conf.default.disable_ipv6=1",
+            ]
+            if physical_dev and re.match(r"^[a-zA-Z0-9_.:-]+$", physical_dev):
+                safe_dev = physical_dev.replace(".", "/")
+                params.append(f"net.ipv6.conf.{safe_dev}.disable_ipv6=1")
+            if os.path.exists(os.path.join(IPV6_CONF_DIR, "lo", "disable_ipv6")):
+                params.append(f"net.ipv6.conf.lo.disable_ipv6={lo_val}")
+
+            self.run_cmd([sysctl_bin, "-w"] + params, check=False)
+
+        return self.is_ipv6_disabled(physical_dev=physical_dev)
+
+    def restore_ipv6(self, prev_state: Optional[Dict[str, Any]] = None) -> bool:
+        """
+        Restores kernel IPv6 disable_ipv6 sysctl state saved before VPN connection.
+        """
+        if not os.path.isdir(IPV6_CONF_DIR):
+            return True
+
+        all_val = 0
+        default_val = 0
+        interfaces: Dict[str, int] = {}
+
+        if isinstance(prev_state, dict):
+            all_val = 1 if prev_state.get("all", 0) else 0
+            default_val = 1 if prev_state.get("default", 0) else 0
+            raw_ifaces = prev_state.get("interfaces")
+            if isinstance(raw_ifaces, dict):
+                for iface, val in raw_ifaces.items():
+                    if (
+                        isinstance(iface, str)
+                        and re.match(r"^[a-zA-Z0-9_.:-]+$", iface)
+                        and os.path.exists(os.path.join(IPV6_CONF_DIR, iface, "disable_ipv6"))
+                    ):
+                        interfaces[iface] = 1 if val else 0
+
+        # 1. Prefer vpn-core-helper
+        helper = self._select_helper("ipv6-restore")
+        if helper:
+            args = [helper, "ipv6-restore", str(all_val), str(default_val)]
+            for iface, val in interfaces.items():
+                args.append(f"{iface}={val}")
+            res = self.run_cmd(args, check=False)
+            if res.returncode == 0:
+                return True
+
+        # 2. Fallback to sysctl directly
+        sysctl_bin = shutil.which("sysctl")
+        if sysctl_bin:
+            params: List[str] = [
+                f"net.ipv6.conf.all.disable_ipv6={all_val}",
+                f"net.ipv6.conf.default.disable_ipv6={default_val}",
+            ]
+            for iface, val in interfaces.items():
+                safe_iface = iface.replace(".", "/")
+                params.append(f"net.ipv6.conf.{safe_iface}.disable_ipv6={val}")
+            res = self.run_cmd([sysctl_bin, "-w"] + params, check=False)
+            return res.returncode == 0
+
+        return False
 
     def configure_dns(self, tun_name: str = "tun0", primary_dns: str = "1.1.1.1", backup_dns: str = "8.8.8.8") -> bool:
         """
-        Configures per-interface DNS and wildcard domain routing on TUN interface using resolvectl / systemd-resolve.
+        Configures DNS on TUN interface across all Linux distros
+        (systemd-resolved, systemd-resolve, openresolv/resolvconf, or /etc/resolv.conf via vpn-core-helper).
         """
         p_dns = primary_dns.strip()
         b_dns = (backup_dns or "").strip()
+
+        # 1. Prefer vpn-core-helper (supports systemd-resolved, openresolv, and /etc/resolv.conf passwordlessly)
+        helper = self._select_helper("dns-up")
+        if helper:
+            args = [helper, "dns-up", tun_name, p_dns]
+            if b_dns:
+                args.append(b_dns)
+            res = self.run_cmd(args, check=False)
+            if res.returncode == 0:
+                return True
 
         dns_args = [p_dns]
         if b_dns:
             dns_args.append(b_dns)
 
-        # 1. Try resolvectl
+        # 2. Direct resolvectl fallback
         if shutil.which("resolvectl"):
             try:
                 res = self.run_cmd(["resolvectl", "dns", tun_name] + dns_args, check=False)
@@ -186,7 +377,7 @@ class NetworkManager:
             except Exception:
                 pass
 
-        # 2. Try legacy systemd-resolve
+        # 3. Direct legacy systemd-resolve fallback
         if shutil.which("systemd-resolve"):
             try:
                 res = self.run_cmd(["systemd-resolve", "-i", tun_name, f"--set-dns={p_dns}", "--set-domain=~."], check=False)
@@ -197,8 +388,16 @@ class NetworkManager:
 
         return False
 
-    def teardown_network(self, server_ip: Optional[str], gateway_ip: Optional[str], physical_dev: Optional[str], tun_name: str = "tun0"):
-        """Restores physical route, reverts DNS, and deletes TUN interface without requiring passwords."""
+    def teardown_network(
+        self,
+        server_ip: Optional[str],
+        gateway_ip: Optional[str],
+        physical_dev: Optional[str],
+        tun_name: str = "tun0",
+        ipv6_prev_state: Optional[Dict[str, Any]] = None,
+        restore_ipv6_flag: bool = False,
+    ):
+        """Restores physical route, reverts DNS, restores IPv6, and deletes TUN interface."""
         # 1. Restore physical default route if known
         if gateway_ip and physical_dev:
             self.run_cmd(["ip", "route", "replace", "default", "via", gateway_ip, "dev", physical_dev], check=False)
@@ -207,12 +406,23 @@ class NetworkManager:
         if server_ip:
             self.run_cmd(["ip", "route", "del", f"{server_ip}/32"], check=False)
 
-        # 3. Revert resolvectl / systemd-resolve DNS (removes DNS configuration cleanly)
-        if shutil.which("resolvectl"):
-            self.run_cmd(["resolvectl", "revert", tun_name], check=False)
-        elif shutil.which("systemd-resolve"):
-            self.run_cmd(["systemd-resolve", "--revert", "-i", tun_name], check=False)
+        # 3. Revert DNS via vpn-core-helper (handles resolvectl, resolvconf, and /etc/resolv.conf backup)
+        helper = self._select_helper("dns-down")
+        dns_reverted = False
+        if helper:
+            res = self.run_cmd([helper, "dns-down", tun_name], check=False)
+            dns_reverted = (res.returncode == 0)
+
+        if not dns_reverted:
+            if shutil.which("resolvectl"):
+                self.run_cmd(["resolvectl", "revert", tun_name], check=False)
+            elif shutil.which("systemd-resolve"):
+                self.run_cmd(["systemd-resolve", "--revert", "-i", tun_name], check=False)
 
         # 4. Remove TUN device
         if self.is_tun_active(tun_name):
             self.run_cmd(["ip", "link", "delete", tun_name], check=False)
+
+        # 5. Restore IPv6 sysctl state if disabled during VPN session
+        if restore_ipv6_flag or ipv6_prev_state is not None:
+            self.restore_ipv6(prev_state=ipv6_prev_state)

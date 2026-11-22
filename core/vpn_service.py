@@ -53,7 +53,10 @@ class VPNService:
                 if self.process_mgr.is_running() and self.network_mgr.is_tun_active(tun_dev):
                     self._state = STATE_CONNECTED
                     self.stats_monitor = StatsMonitor(tun_dev)
-                    self.stats_monitor.start()
+                    conn_time = session.get("connected_at")
+                    init_rx = session.get("initial_rx")
+                    init_tx = session.get("initial_tx")
+                    self.stats_monitor.start(start_time=conn_time, initial_rx=init_rx, initial_tx=init_tx)
                     profile_id = session.get("profile_id")
                     if profile_id:
                         self._active_profile = self.config_mgr.get_profile_by_id(profile_id)
@@ -95,11 +98,13 @@ class VPNService:
                 print(f"[VPNService] Listener error: {e}", file=sys.stderr)
 
     def _teardown_internal(self):
-        """Internal teardown of network routes, DNS, processes, and session."""
+        """Internal teardown of network routes, DNS, IPv6, processes, and session."""
         server_ip = None
         gw = None
         dev = None
         tun_dev = "tun0"
+        ipv6_disabled = False
+        ipv6_prev_state = None
 
         if os.path.exists(SESSION_FILE):
             try:
@@ -109,15 +114,19 @@ class VPNService:
                 gw = session.get("gateway_ip")
                 dev = session.get("physical_dev")
                 tun_dev = session.get("tun_dev", "tun0")
+                ipv6_disabled = bool(session.get("ipv6_disabled", False))
+                ipv6_prev_state = session.get("ipv6_prev_state")
             except Exception:
                 pass
 
-        # 1. Teardown network routing & DNS
+        # 1. Teardown network routing, DNS & restore IPv6
         self.network_mgr.teardown_network(
             server_ip=server_ip,
             gateway_ip=gw,
             physical_dev=dev,
-            tun_name=tun_dev
+            tun_name=tun_dev,
+            ipv6_prev_state=ipv6_prev_state if ipv6_disabled else None,
+            restore_ipv6_flag=ipv6_disabled
         )
 
         # 2. Stop daemon processes
@@ -203,19 +212,38 @@ class VPNService:
                 socks_port = int(settings.get("socks_port", 1080))
                 dns_primary = settings.get("dns", "1.1.1.1")
                 dns_backup = settings.get("dns_backup", "8.8.8.8")
+                disable_ipv6_opt = bool(settings.get("disable_ipv6", True))
 
                 # Step 1: Detect physical gateway & interface
-                self._notify("progress", {"message": "Detecting physical network gateway..."})
+                self._notify("stage_changed", {
+                    "stage": "resolving",
+                    "stage_index": 1,
+                    "stage_total": 4,
+                    "stage_label": "Resolving VPN Node",
+                    "message": "Detecting physical network gateway...",
+                    "node_id": "server"
+                })
                 gw, dev = self.network_mgr.get_physical_route(tun_name=tun_dev)
 
                 # Step 2: Resolve server domain to IPv4
                 server_host = profile["server"]
-                self._notify("progress", {"message": f"Resolving server {server_host}..."})
+                self._notify("stage_changed", {
+                    "stage": "resolving",
+                    "stage_index": 1,
+                    "stage_total": 4,
+                    "stage_label": "Resolving VPN Node",
+                    "message": f"Resolving server {server_host}...",
+                    "node_id": "server"
+                })
                 server_ip = self.network_mgr.resolve_server_ip(server_host)
 
                 # Step 3: Write active config for sslocal
                 config_path = self.config_mgr.export_active_config(profile)
 
+                # Snapshot IPv6 sysctl state before mutating network
+                ipv6_prev_state = self.network_mgr.get_ipv6_state(physical_dev=dev) if disable_ipv6_opt else None
+
+                connect_time = time.time()
                 # Save session state before applying routes
                 session_data = {
                     "profile_id": profile["id"],
@@ -226,28 +254,71 @@ class VPNService:
                     "tun_dev": tun_dev,
                     "socks_port": socks_port,
                     "dns_primary": dns_primary,
-                    "dns_backup": dns_backup
+                    "dns_backup": dns_backup,
+                    "ipv6_disabled": False,
+                    "ipv6_prev_state": ipv6_prev_state,
+                    "connected_at": connect_time,
+                    "initial_rx": 0,
+                    "initial_tx": 0
                 }
                 with open(SESSION_FILE, "w") as f:
                     json.dump(session_data, f, indent=2)
 
-                # Step 4: Start sslocal
-                self._notify("progress", {"message": "Starting Shadowsocks core..."})
+                # Step 4: Start sslocal (Stage 2: SOCKS5 Core)
+                self._notify("stage_changed", {
+                    "stage": "sslocal",
+                    "stage_index": 2,
+                    "stage_total": 4,
+                    "stage_label": "Starting SOCKS5 Core",
+                    "message": f"Starting Shadowsocks core daemon ({socks_host}:{socks_port})...",
+                    "node_id": "sslocal"
+                })
                 self.process_mgr.start_sslocal(config_path, host=socks_host, port=socks_port)
 
-                # Step 5: Setup TUN interface
-                self._notify("progress", {"message": f"Creating TUN interface {tun_dev}..."})
+                # Step 5: Setup TUN interface & start tun2socks (Stage 3: TUN & IPv6 Guard)
+                self._notify("stage_changed", {
+                    "stage": "tun0",
+                    "stage_index": 3,
+                    "stage_total": 4,
+                    "stage_label": "Provisioning Virtual L3 tun0",
+                    "message": f"Creating TUN interface {tun_dev} (10.0.0.2/24)...",
+                    "node_id": "tun0"
+                })
                 self.network_mgr.setup_tun_interface(tun_name=tun_dev, tun_ip=tun_ip)
 
-                # Step 6: Start tun2socks
-                self._notify("progress", {"message": "Starting tun2socks engine..."})
                 self.process_mgr.start_tun2socks(
                     tun_device=tun_dev,
                     proxy_url=f"socks5://{socks_host}:{socks_port}"
                 )
 
-                # Step 7: Apply routing & route pinning
-                self._notify("progress", {"message": "Routing system traffic through VPN..."})
+                # Step 6: Disable network IPv6 to prevent IPv6 leaks
+                ipv6_disabled_ok = False
+                if disable_ipv6_opt:
+                    self._notify("stage_changed", {
+                        "stage": "tun0",
+                        "stage_index": 3,
+                        "stage_total": 4,
+                        "stage_label": "Arming IPv6 Leak Shield",
+                        "message": "Disabling network IPv6 to prevent IPv6 leaks...",
+                        "node_id": "tun0"
+                    })
+                    session_data["ipv6_disabled"] = True
+                    with open(SESSION_FILE, "w") as f:
+                        json.dump(session_data, f, indent=2)
+                    ipv6_disabled_ok = self.network_mgr.disable_ipv6(
+                        physical_dev=dev,
+                        prev_state=ipv6_prev_state
+                    )
+
+                # Step 7: Apply routing & route pinning (Stage 4: Full-Tunnel Routing)
+                self._notify("stage_changed", {
+                    "stage": "routing",
+                    "stage_index": 4,
+                    "stage_total": 4,
+                    "stage_label": "Securing Kernel Routes",
+                    "message": "Routing system traffic through VPN...",
+                    "node_id": "apps"
+                })
                 self.network_mgr.apply_routes(
                     server_ip=server_ip,
                     gateway_ip=gw,
@@ -256,23 +327,32 @@ class VPNService:
                 )
 
                 # Step 8: Configure DNS
-                self._notify("progress", {"message": "Configuring secure DNS..."})
                 self.network_mgr.configure_dns(
                     tun_name=tun_dev,
                     primary_dns=dns_primary,
                     backup_dns=dns_backup
                 )
 
-                # Step 9: Start stats monitor
+                # Step 9: Start real stats monitor & persist session initial telemetry
                 self.stats_monitor = StatsMonitor(interface=tun_dev)
-                self.stats_monitor.start()
+                self.stats_monitor.start(start_time=connect_time)
+                session_data["initial_rx"] = self.stats_monitor.initial_rx
+                session_data["initial_tx"] = self.stats_monitor.initial_tx
+                with open(SESSION_FILE, "w") as f:
+                    json.dump(session_data, f, indent=2)
 
                 self._state = STATE_CONNECTED
                 self._notify("connected", {
+                    "stage": "connected",
+                    "stage_index": 4,
+                    "stage_label": "Live Flow Active",
                     "message": "VPN Connected Successfully",
                     "profile": profile,
                     "server_ip": server_ip,
-                    "tun_dev": tun_dev
+                    "tun_dev": tun_dev,
+                    "gateway_ip": gw,
+                    "physical_dev": dev,
+                    "ipv6_disabled": ipv6_disabled_ok
                 })
                 return True
 
@@ -280,7 +360,13 @@ class VPNService:
                 self._last_error = str(e)
                 self._rollback_on_error()
                 self._state = STATE_ERROR
-                self._notify("error", {"error": self._last_error})
+                self._notify("error", {
+                    "stage": "error",
+                    "stage_index": -1,
+                    "stage_label": "Connection Error",
+                    "error": self._last_error,
+                    "message": self._last_error
+                })
                 return False
 
     def _rollback_on_error(self):
@@ -297,18 +383,37 @@ class VPNService:
                 return True
 
             self._state = STATE_DISCONNECTING
+            self._notify("stage_changed", {
+                "stage": "teardown",
+                "stage_index": 0,
+                "stage_total": 4,
+                "stage_label": "Restoring Kernel Routes & IPv6",
+                "message": "Disconnecting VPN..."
+            })
             self._notify("state_changed", {"message": "Disconnecting VPN..."})
 
             try:
                 self._teardown_internal()
                 self._state = STATE_DISCONNECTED
-                self._notify("disconnected", {"message": "VPN Disconnected"})
+                self._notify("disconnected", {
+                    "stage": "idle",
+                    "stage_index": 0,
+                    "stage_total": 4,
+                    "stage_label": "Direct Physical Route",
+                    "message": "VPN Disconnected"
+                })
                 return True
 
             except Exception as e:
                 self._last_error = str(e)
                 self._state = STATE_ERROR
-                self._notify("error", {"error": self._last_error})
+                self._notify("error", {
+                    "stage": "error",
+                    "stage_index": -1,
+                    "stage_label": "Disconnect Error",
+                    "error": self._last_error,
+                    "message": self._last_error
+                })
                 return False
 
     def set_dns(self, primary_dns: str, backup_dns: Optional[str] = "8.8.8.8", preset_name: Optional[str] = None) -> bool:

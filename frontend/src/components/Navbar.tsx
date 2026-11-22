@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
-import { motion } from "framer-motion";
-import { Download, Terminal, BookOpen, Shield, HelpCircle, Menu, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Download, Terminal, BookOpen, Shield, HelpCircle, Menu, X, Network } from "lucide-react";
 import GithubIcon from "@/components/GithubIcon";
 
 export default function Navbar() {
@@ -12,32 +12,37 @@ export default function Navbar() {
 
   useEffect(() => {
     const handleScroll = () => {
-      setScrolled(window.scrollY > 20);
+      setScrolled(window.scrollY > 18);
     };
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   const navLinks = [
-    { name: "Install", href: "#downlink", icon: Download },
-    { name: "Kernel & Architecture", href: "#kernel-integration", icon: Shield },
+    { name: "Interactive Model", href: "#architecture", icon: Network },
     { name: "Live Demo", href: "#simulator", icon: Terminal },
+    { name: "Install", href: "#downlink", icon: Download },
+    { name: "Kernel Stack", href: "#kernel-integration", icon: Shield },
     { name: "User Guide", href: "#user-guide", icon: BookOpen },
-    { name: "Troubleshooting", href: "#faq", icon: HelpCircle },
+    { name: "FAQ", href: "#faq", icon: HelpCircle },
   ];
 
   return (
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         scrolled
-          ? "bg-[#07090e]/85 backdrop-blur-xl border-b border-white/[0.08] shadow-2xl shadow-cyan-950/20 py-3"
+          ? "bg-white/85 backdrop-blur-xl border-b border-slate-200/80 shadow-sm shadow-slate-900/[0.04] py-3"
           : "bg-transparent py-5"
       }`}
     >
       <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
         {/* Logo & Brand */}
         <a href="#" className="flex items-center gap-3 group">
-          <div className="relative w-9 h-9 rounded-xl overflow-hidden p-0.5 bg-gradient-to-br from-cyan-500/30 to-purple-600/30 border border-cyan-500/40 group-hover:border-cyan-400/80 transition-colors shadow-lg shadow-cyan-500/20">
+          <motion.div
+            whileHover={{ rotate: 6, scale: 1.06 }}
+            transition={{ type: "spring", stiffness: 360, damping: 20 }}
+            className="relative w-9 h-9 rounded-xl overflow-hidden p-0.5 bg-gradient-to-br from-sky-500/20 to-emerald-500/20 border border-sky-200 group-hover:border-sky-400 transition-colors shadow-sm"
+          >
             <Image
               src="/icon.png"
               alt="AuraLink Logo"
@@ -45,20 +50,19 @@ export default function Navbar() {
               height={36}
               className="w-full h-full object-cover rounded-lg"
             />
-            <div className="absolute inset-0 bg-cyan-400/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
-          </div>
+          </motion.div>
           <div className="flex items-center gap-2">
-            <span className="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-cyan-100 to-slate-200 bg-clip-text text-transparent">
+            <span className="font-extrabold text-lg tracking-tight text-slate-900">
               AuraLink
             </span>
-            <span className="text-[11px] font-mono font-medium px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
+            <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
               v1.0.0
             </span>
           </div>
         </a>
 
         {/* Desktop Navigation Links */}
-        <nav className="hidden md:flex items-center gap-1 bg-slate-900/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/[0.06]">
+        <nav className="hidden lg:flex items-center gap-1 bg-white/80 backdrop-blur-md px-2.5 py-1.5 rounded-full border border-slate-200/90 shadow-sm">
           {navLinks.map((link) => (
             <a
               key={link.name}
@@ -69,39 +73,41 @@ export default function Navbar() {
                   window.dispatchEvent(new CustomEvent("switch-userguide-tab", { detail: target }));
                 }
               }}
-              className="flex items-center gap-1.5 px-3 py-1 text-sm font-medium text-slate-300 hover:text-cyan-400 hover:bg-white/[0.04] rounded-full transition-all duration-200"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-sky-700 hover:bg-sky-50 rounded-full transition-all duration-200"
             >
-              <link.icon className="w-3.5 h-3.5 opacity-70" />
+              <link.icon className="w-3.5 h-3.5 text-slate-400" />
               {link.name}
             </a>
           ))}
         </nav>
 
         {/* Right Action CTA */}
-        <div className="hidden sm:flex items-center gap-3">
+        <div className="hidden sm:flex items-center gap-2.5">
           <a
             href="https://github.com/Script-By-Lin/Arch_VPN"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold text-slate-300 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] hover:border-slate-600 rounded-lg transition-all"
+            className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 rounded-xl transition-all shadow-xs"
           >
-            <GithubIcon className="w-4 h-4 text-slate-300" />
+            <GithubIcon className="w-4 h-4 text-slate-700" />
             <span>GitHub</span>
           </a>
 
-          <a
+          <motion.a
+            whileHover={{ y: -1, scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             href="#downlink"
-            className="relative group overflow-hidden px-4 py-1.5 rounded-lg text-xs font-semibold text-black bg-gradient-to-r from-cyan-400 to-emerald-400 hover:from-cyan-300 hover:to-emerald-300 transition-all shadow-lg shadow-cyan-500/20 hover:shadow-cyan-400/30 flex items-center gap-1.5"
+            className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-sky-600 to-emerald-600 hover:from-sky-500 hover:to-emerald-500 transition-all shadow-md shadow-sky-600/20 flex items-center gap-1.5"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Install Now</span>
-          </a>
+          </motion.a>
         </div>
 
         {/* Mobile Menu Toggle */}
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="md:hidden p-2 rounded-lg text-slate-400 hover:text-white bg-slate-900/80 border border-white/[0.08]"
+          className="lg:hidden p-2 rounded-xl text-slate-600 hover:text-slate-900 bg-white border border-slate-200 shadow-xs"
           aria-label="Toggle Navigation Menu"
         >
           {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -109,51 +115,53 @@ export default function Navbar() {
       </div>
 
       {/* Mobile Menu Dropdown */}
-      {mobileMenuOpen && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          className="md:hidden bg-[#0a0d17]/95 backdrop-blur-2xl border-b border-white/[0.08] px-4 py-4 space-y-2"
-        >
-          {navLinks.map((link) => (
-            <a
-              key={link.name}
-              href={link.href}
-              onClick={() => {
-                setMobileMenuOpen(false);
-                const target = link.href.replace("#", "");
-                if (typeof window !== "undefined") {
-                  window.dispatchEvent(new CustomEvent("switch-userguide-tab", { detail: target }));
-                }
-              }}
-              className="flex items-center gap-2.5 px-3 py-2 text-sm font-medium text-slate-300 hover:text-cyan-400 hover:bg-white/[0.04] rounded-lg"
-            >
-              <link.icon className="w-4 h-4 text-cyan-400/80" />
-              {link.name}
-            </a>
-          ))}
-          <div className="pt-3 border-t border-white/[0.06] flex flex-col gap-2">
-            <a
-              href="https://github.com/Script-By-Lin/Arch_VPN"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 py-2 text-xs font-medium text-slate-300 bg-white/[0.04] rounded-lg"
-            >
-              <GithubIcon className="w-4 h-4" />
-              <span>View Repository on GitHub</span>
-            </a>
-            <a
-              href="#downlink"
-              onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center justify-center gap-2 py-2 text-xs font-semibold text-black bg-gradient-to-r from-cyan-400 to-emerald-400 rounded-lg"
-            >
-              <Download className="w-4 h-4" />
-              <span>Quick Install (1-Line)</span>
-            </a>
-          </div>
-        </motion.div>
-      )}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="lg:hidden bg-white/95 backdrop-blur-2xl border-b border-slate-200 px-4 py-4 space-y-1.5 shadow-lg"
+          >
+            {navLinks.map((link) => (
+              <a
+                key={link.name}
+                href={link.href}
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  const target = link.href.replace("#", "");
+                  if (typeof window !== "undefined") {
+                    window.dispatchEvent(new CustomEvent("switch-userguide-tab", { detail: target }));
+                  }
+                }}
+                className="flex items-center gap-2.5 px-3 py-2.5 text-sm font-semibold text-slate-700 hover:text-sky-700 hover:bg-sky-50 rounded-xl"
+              >
+                <link.icon className="w-4 h-4 text-sky-600" />
+                {link.name}
+              </a>
+            ))}
+            <div className="pt-3 border-t border-slate-200 flex flex-col gap-2">
+              <a
+                href="https://github.com/Script-By-Lin/Arch_VPN"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 py-2.5 text-xs font-semibold text-slate-700 bg-slate-100 rounded-xl"
+              >
+                <GithubIcon className="w-4 h-4" />
+                <span>View Repository on GitHub</span>
+              </a>
+              <a
+                href="#downlink"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center justify-center gap-2 py-2.5 text-xs font-bold text-white bg-gradient-to-r from-sky-600 to-emerald-600 rounded-xl"
+              >
+                <Download className="w-4 h-4" />
+                <span>Quick Install (1-Line)</span>
+              </a>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </header>
   );
 }

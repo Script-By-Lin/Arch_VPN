@@ -11,17 +11,13 @@ export default function Footer() {
   };
 
   return (
-    <footer className="border-t border-white/[0.08] bg-[#040609] pt-16 pb-12 relative overflow-hidden">
-      {/* Glow accent */}
-      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-96 h-32 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none" />
-
+    <footer className="border-t border-slate-200 bg-slate-50 pt-16 pb-12 relative overflow-hidden">
       <div className="w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-10 pb-12 border-b border-white/[0.06]">
-          
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-10 pb-12 border-b border-slate-200">
           {/* Col 1: Brand */}
           <div className="md:col-span-2 space-y-4">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl overflow-hidden p-0.5 bg-gradient-to-br from-cyan-500/30 to-purple-600/30 border border-cyan-500/40">
+              <div className="w-8 h-8 rounded-xl overflow-hidden p-0.5 bg-gradient-to-br from-sky-500/20 to-emerald-500/20 border border-sky-200">
                 <Image
                   src="/icon.png"
                   alt="AuraLink"
@@ -30,54 +26,58 @@ export default function Footer() {
                   className="w-full h-full object-cover rounded-lg"
                 />
               </div>
-              <span className="font-bold text-lg text-white">AuraLink Linux</span>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
+              <span className="font-extrabold text-lg text-slate-900">AuraLink Linux</span>
+              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
                 v1.0.0
               </span>
             </div>
 
-            <p className="text-xs sm:text-sm text-slate-400 max-w-sm leading-relaxed">
-              Universal high-performance Shadowsocks & tun2socks VPN Client for Linux distributions. 
-              Full TUN kernel routing, anti-censorship TLS prefixes, and zero-leak DNS protection.
+            <p className="text-xs sm:text-sm text-slate-600 max-w-sm leading-relaxed">
+              Universal high-performance Shadowsocks & tun2socks VPN Client for Linux distributions. Full TUN kernel routing, IPv6 leak blocking, anti-censorship TLS prefixes, and zero-leak DNS protection.
             </p>
 
-            <div className="flex items-center gap-3 pt-2">
+            <div className="flex items-center gap-3 pt-1">
               <a
                 href="https://github.com/Script-By-Lin/Arch_VPN"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-xs text-slate-300 hover:text-white transition-colors"
+                className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white hover:bg-sky-50 border border-slate-200 hover:border-sky-300 text-xs font-semibold text-slate-700 hover:text-sky-700 transition-colors shadow-xs"
               >
                 <GithubIcon className="w-3.5 h-3.5" />
                 <span>GitHub Repository</span>
               </a>
-              <span className="text-xs text-slate-500 font-mono">Open Source</span>
+              <span className="text-xs text-slate-500 font-mono font-medium">Open Source</span>
             </div>
           </div>
 
           {/* Col 2: Quick Links */}
           <div className="space-y-3">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-300 font-mono">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 font-mono">
               Quick Links
             </h4>
-            <ul className="space-y-2 text-xs text-slate-400">
+            <ul className="space-y-2 text-xs text-slate-600">
               <li>
-                <a href="#downlink" className="hover:text-cyan-400 transition-colors">
-                  1-Line Install Downlink
+                <a href="#architecture" className="hover:text-sky-700 transition-colors">
+                  Interactive Tunnel Model
                 </a>
               </li>
               <li>
-                <a href="#kernel-integration" className="hover:text-cyan-400 transition-colors">
-                  Kernel & Architecture
-                </a>
-              </li>
-              <li>
-                <a href="#simulator" className="hover:text-cyan-400 transition-colors">
+                <a href="#simulator" className="hover:text-sky-700 transition-colors">
                   Interactive Live Demo
                 </a>
               </li>
               <li>
-                <a href="#user-guide" className="hover:text-cyan-400 transition-colors">
+                <a href="#downlink" className="hover:text-sky-700 transition-colors">
+                  1-Line Install Downlink
+                </a>
+              </li>
+              <li>
+                <a href="#kernel-integration" className="hover:text-sky-700 transition-colors">
+                  Kernel & Architecture
+                </a>
+              </li>
+              <li>
+                <a href="#user-guide" className="hover:text-sky-700 transition-colors">
                   User Guide & Manual
                 </a>
               </li>
@@ -86,106 +86,60 @@ export default function Footer() {
 
           {/* Col 3: Documentation */}
           <div className="space-y-3">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-300 font-mono">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 font-mono">
               Documentation
             </h4>
-            <ul className="space-y-2 text-xs text-slate-400">
-              <li>
-                <a
-                  href="#quickstart"
-                  onClick={() => {
-                    if (typeof window !== "undefined") {
-                      window.dispatchEvent(new CustomEvent("switch-userguide-tab", { detail: "quickstart" }));
-                    }
-                  }}
-                  className="hover:text-cyan-400 transition-colors"
-                >
-                  Quick Start Guide
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#gui"
-                  onClick={() => {
-                    if (typeof window !== "undefined") {
-                      window.dispatchEvent(new CustomEvent("switch-userguide-tab", { detail: "gui" }));
-                    }
-                  }}
-                  className="hover:text-cyan-400 transition-colors"
-                >
-                  Desktop GUI Walkthrough
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#cli"
-                  onClick={() => {
-                    if (typeof window !== "undefined") {
-                      window.dispatchEvent(new CustomEvent("switch-userguide-tab", { detail: "cli" }));
-                    }
-                  }}
-                  className="hover:text-cyan-400 transition-colors"
-                >
-                  CLI Commands Reference
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#protocol"
-                  onClick={() => {
-                    if (typeof window !== "undefined") {
-                      window.dispatchEvent(new CustomEvent("switch-userguide-tab", { detail: "protocol" }));
-                    }
-                  }}
-                  className="hover:text-cyan-400 transition-colors"
-                >
-                  ssconf:// Subscription Protocol
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#faq"
-                  onClick={() => {
-                    if (typeof window !== "undefined") {
-                      window.dispatchEvent(new CustomEvent("switch-userguide-tab", { detail: "faq" }));
-                    }
-                  }}
-                  className="hover:text-cyan-400 transition-colors"
-                >
-                  Troubleshooting & FAQ
-                </a>
-              </li>
+            <ul className="space-y-2 text-xs text-slate-600">
+              {[
+                { href: "#quickstart", tab: "quickstart", label: "Quick Start Guide" },
+                { href: "#gui", tab: "gui", label: "Desktop GUI Walkthrough" },
+                { href: "#cli", tab: "cli", label: "CLI Commands Reference" },
+                { href: "#protocol", tab: "protocol", label: "ssconf:// Subscription Protocol" },
+                { href: "#faq", tab: "faq", label: "Troubleshooting & FAQ" },
+              ].map((item) => (
+                <li key={item.tab}>
+                  <a
+                    href={item.href}
+                    onClick={() => {
+                      if (typeof window !== "undefined") {
+                        window.dispatchEvent(
+                          new CustomEvent("switch-userguide-tab", { detail: item.tab })
+                        );
+                      }
+                    }}
+                    className="hover:text-sky-700 transition-colors"
+                  >
+                    {item.label}
+                  </a>
+                </li>
+              ))}
             </ul>
           </div>
-
         </div>
 
-        {/* Bottom copyright and tech credit */}
-        <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
+        {/* Bottom copyright */}
+        <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
           <div className="flex items-center gap-1.5">
             <span>Crafted for Linux by</span>
             <a
               href="https://github.com/Script-By-Lin"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-cyan-400 hover:underline font-medium"
+              className="text-sky-700 hover:underline font-semibold"
             >
               Script-By-Lin
             </a>
           </div>
 
-          <div className="flex items-center gap-4">
-            <button
-              onClick={scrollToTop}
-              className="p-2 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-slate-400 hover:text-white border border-white/[0.06] transition-colors"
-              title="Scroll to top"
-              aria-label="Scroll to top"
-            >
-              <ArrowUp className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          <button
+            onClick={scrollToTop}
+            className="p-2 rounded-xl bg-white hover:bg-sky-50 text-slate-500 hover:text-sky-700 border border-slate-200 hover:border-sky-300 transition-colors shadow-xs cursor-pointer"
+            title="Scroll to top"
+            aria-label="Scroll to top"
+          >
+            <ArrowUp className="w-3.5 h-3.5" />
+          </button>
         </div>
-
       </div>
     </footer>
   );

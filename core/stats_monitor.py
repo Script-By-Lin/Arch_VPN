@@ -15,7 +15,7 @@ def format_bytes(num_bytes: float) -> str:
     """Format bytes into human-readable string."""
     for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
         if abs(num_bytes) < 1024.0:
-            return f"{num_bytes:.2f} {unit}" if unit in ['MB', 'GB', 'TB'] else f"{int(num_bytes)} {unit}"
+            return f"{num_bytes:.2f} {unit}" if unit != 'B' else f"{int(num_bytes)} B"
         num_bytes /= 1024.0
     return f"{num_bytes:.2f} PB"
 
@@ -34,65 +34,100 @@ class StatsMonitor:
         self.start_time = None
         self.initial_rx = None
         self.initial_tx = None
+        self._smoothed_rx_speed = 0.0
+        self._smoothed_tx_speed = 0.0
 
-    def start(self):
-        self.start_time = time.time()
+    def start(self, start_time: Optional[float] = None, initial_rx: Optional[int] = None, initial_tx: Optional[int] = None):
+        """Starts monitoring. Optionally restores a previous session start time and initial bytes."""
+        now = time.time()
+        self.start_time = float(start_time) if start_time is not None else now
         rx, tx = self._read_interface_bytes()
-        self.initial_rx = rx
-        self.initial_tx = tx
+        self.initial_rx = int(initial_rx) if initial_rx is not None else rx
+        self.initial_tx = int(initial_tx) if initial_tx is not None else tx
         self.last_rx = rx
         self.last_tx = tx
-        self.last_time = time.time()
+        self.last_time = now
+        self._smoothed_rx_speed = 0.0
+        self._smoothed_tx_speed = 0.0
 
     def stop(self):
         self.start_time = None
         self.initial_rx = None
         self.initial_tx = None
+        self._smoothed_rx_speed = 0.0
+        self._smoothed_tx_speed = 0.0
 
     def _read_interface_bytes(self) -> Tuple[int, int]:
-        """Read rx_bytes and tx_bytes for interface from /proc/net/dev."""
+        """Read rx_bytes and tx_bytes for exact interface from /proc/net/dev."""
         try:
             with open("/proc/net/dev", "r") as f:
                 lines = f.readlines()
             for line in lines:
-                if f"{self.interface}:" in line:
-                    data = line.split(f"{self.interface}:")[1].split()
-                    rx_bytes = int(data[0])
-                    tx_bytes = int(data[8])
-                    return rx_bytes, tx_bytes
+                if ":" in line:
+                    iface_part, stats_part = line.split(":", 1)
+                    if iface_part.strip() == self.interface:
+                        cols = stats_part.split()
+                        if len(cols) >= 9:
+                            return int(cols[0]), int(cols[8])
         except Exception:
             pass
         return 0, 0
 
     def get_stats(self) -> Dict[str, Any]:
         """
-        Returns live statistics:
+        Returns live telemetry:
         {
-            "connected_duration_sec": 120,
-            "connected_duration_str": "02:00",
+            "is_active": True,
+            "duration_sec": 120,
+            "duration_str": "02:00",
             "rx_bytes": 1024000,
             "tx_bytes": 512000,
-            "rx_speed_bps": 20480,
-            "tx_speed_bps": 10240,
+            "rx_speed_bps": 20480.0,
+            "tx_speed_bps": 10240.0,
             "rx_speed_str": "20.48 KB/s",
             "tx_speed_str": "10.24 KB/s",
             "rx_total_str": "1.02 MB",
             "tx_total_str": "512 KB"
         }
         """
+        if self.start_time is None:
+            return {
+                "is_active": False,
+                "duration_sec": 0,
+                "duration_str": "00:00",
+                "rx_bytes": 0,
+                "tx_bytes": 0,
+                "rx_speed_bps": 0.0,
+                "tx_speed_bps": 0.0,
+                "rx_speed_str": "0 B/s",
+                "tx_speed_str": "0 B/s",
+                "rx_total_str": "0 B",
+                "tx_total_str": "0 B"
+            }
+
         now = time.time()
-        dt = max(now - self.last_time, 0.1)
+        dt = max(now - self.last_time, 0.05)
         curr_rx, curr_tx = self._read_interface_bytes()
 
         if self.initial_rx is None:
             self.initial_rx = curr_rx
             self.initial_tx = curr_tx
 
-        # Calculate live speed
+        # Calculate live transfer rate with light smoothing (0.7 instant, 0.3 prior)
         rx_diff = max(curr_rx - self.last_rx, 0)
         tx_diff = max(curr_tx - self.last_tx, 0)
-        rx_speed = rx_diff / dt
-        tx_speed = tx_diff / dt
+        instant_rx_speed = rx_diff / dt
+        instant_tx_speed = tx_diff / dt
+
+        if self._smoothed_rx_speed == 0.0 and instant_rx_speed > 0:
+            self._smoothed_rx_speed = instant_rx_speed
+        else:
+            self._smoothed_rx_speed = 0.75 * instant_rx_speed + 0.25 * self._smoothed_rx_speed
+
+        if self._smoothed_tx_speed == 0.0 and instant_tx_speed > 0:
+            self._smoothed_tx_speed = instant_tx_speed
+        else:
+            self._smoothed_tx_speed = 0.75 * instant_tx_speed + 0.25 * self._smoothed_tx_speed
 
         self.last_rx = curr_rx
         self.last_tx = curr_tx
@@ -101,7 +136,7 @@ class StatsMonitor:
         total_rx = max(curr_rx - self.initial_rx, 0)
         total_tx = max(curr_tx - self.initial_tx, 0)
 
-        duration = int(now - self.start_time) if self.start_time else 0
+        duration = max(int(now - self.start_time), 0)
         hours, rem = divmod(duration, 3600)
         mins, secs = divmod(rem, 60)
         if hours > 0:
@@ -110,14 +145,15 @@ class StatsMonitor:
             duration_str = f"{mins:02d}:{secs:02d}"
 
         return {
+            "is_active": True,
             "duration_sec": duration,
             "duration_str": duration_str,
             "rx_bytes": total_rx,
             "tx_bytes": total_tx,
-            "rx_speed_bps": rx_speed,
-            "tx_speed_bps": tx_speed,
-            "rx_speed_str": format_speed(rx_speed),
-            "tx_speed_str": format_speed(tx_speed),
+            "rx_speed_bps": self._smoothed_rx_speed,
+            "tx_speed_bps": self._smoothed_tx_speed,
+            "rx_speed_str": format_speed(self._smoothed_rx_speed),
+            "tx_speed_str": format_speed(self._smoothed_tx_speed),
             "rx_total_str": format_bytes(total_rx),
             "tx_total_str": format_bytes(total_tx)
         }

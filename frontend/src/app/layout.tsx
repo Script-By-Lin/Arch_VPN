@@ -14,8 +14,22 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "AuraLink — Universal Shadowsocks & tun2socks VPN Client for Linux",
-  description: "Next-generation high-performance VPN client for Arch Linux, Debian, Ubuntu, Fedora, and openSUSE. Full TUN kernel routing, anti-censorship prefixes, and zero-leak DNS.",
-  keywords: ["AuraLink", "Shadowsocks", "tun2socks", "Linux VPN", "Arch Linux", "CachyOS", "Debian", "Ubuntu", "Fedora", "DPI Bypass", "Anti-Censorship", "ssconf"],
+  description:
+    "Next-generation high-performance VPN client for Arch Linux, Debian, Ubuntu, Fedora, and openSUSE. Full TUN kernel routing, anti-censorship prefixes, IPv6 leak guard, and zero-leak DNS.",
+  keywords: [
+    "AuraLink",
+    "Shadowsocks",
+    "tun2socks",
+    "Linux VPN",
+    "Arch Linux",
+    "CachyOS",
+    "Debian",
+    "Ubuntu",
+    "Fedora",
+    "DPI Bypass",
+    "Anti-Censorship",
+    "ssconf",
+  ],
   authors: [{ name: "Script-By-Lin" }],
   icons: {
     icon: "/icon.png",
@@ -23,7 +37,8 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: "AuraLink — Universal Shadowsocks & tun2socks VPN Client for Linux",
-    description: "High-performance TUN-based VPN client with anti-censorship TLS prefixes and zero-leak DNS for all Linux distributions.",
+    description:
+      "High-performance TUN-based VPN client with anti-censorship TLS prefixes, IPv6 leak protection, and zero-leak DNS for all Linux distributions.",
     type: "website",
   },
 };
@@ -36,9 +51,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-[#07090e] text-slate-100 selection:bg-cyan-500/30 selection:text-cyan-200">
+      <body className="min-h-full flex flex-col bg-[#f8fafc] text-slate-900 selection:bg-sky-200 selection:text-sky-950">
         {children}
       </body>
     </html>

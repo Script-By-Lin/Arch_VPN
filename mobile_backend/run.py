@@ -28,7 +28,7 @@ def main():
     print(f"  Bind        : http://{host}:{port}")
     print(f"  Admin Panel : /admin")
     print(f"  Mobile Feed : /api/mobile/free-keys")
-    print(f"  SQLite DB   : {app.state.db.db_path}")
+    print(f"  Database    : {app.state.db.backend_type} ({app.state.db.display_target})")
     if env_token_set:
         print("  Admin Token : [loaded from AURALINK_ADMIN_TOKEN env var]")
     else:

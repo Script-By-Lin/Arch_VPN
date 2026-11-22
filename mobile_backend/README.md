@@ -60,9 +60,11 @@ The repository root includes a Railway-ready [Dockerfile](../Dockerfile), [.dock
 2. In your Railway Service → **Variables**, add:
    - `AURALINK_ADMIN_TOKEN` = `<your-strong-secret-token>`
    *(Railway injects `PORT` automatically — no need to set it.)*
-3. *(Recommended for persistence)* In your Railway Service → **Volumes**, click **Add Volume** and set **Mount Path** to:
-   - `/data`
-   *(The backend automatically detects `RAILWAY_VOLUME_MOUNT_PATH` / `/data` and stores `free_keys.db` there so uploaded keys survive redeploys.)*
+3. *(Recommended for persistence)* Attach **PostgreSQL** or a **Volume**:
+   - **Option A — Railway PostgreSQL (recommended)**: Click **New → Database → Add PostgreSQL**, then in your backend service **Variables**, add:
+     - `DATABASE_URL` = `${{Postgres.DATABASE_URL}}`
+     *(Also supports `AURALINK_DATABASE_URL`, `POSTGRES_URL`, `POSTGRESQL_URL`, `DATABASE_PRIVATE_URL`, `DATABASE_PUBLIC_URL`, and `postgres://` URLs. Schema tables `free_keys` and `mobile_release` are created automatically on startup and `/api/health` reports `"database": "postgresql"`.)*
+   - **Option B — SQLite on Railway Volume**: In your Railway Service → **Volumes**, click **Add Volume** and set **Mount Path** to `/data`.
 4. Generate a public domain in **Settings → Networking → Generate Domain** (e.g. `https://auralink-mobile-admin.up.railway.app`).
    - Open `https://<your-railway-domain>/admin` to upload free region keys.
    - Enter `https://<your-railway-domain>` in **AuraLink Mobile → Settings → Mobile Free Keys Admin Backend**.

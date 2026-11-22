@@ -9,6 +9,7 @@ services:
     environment:
       PORT: "${PORT:-8088}"
       AURALINK_ADMIN_TOKEN: "${AURALINK_ADMIN_TOKEN:-change-me-local-admin-token}"
+      DATABASE_URL: "${DATABASE_URL:-}"
       AURALINK_DATA_DIR: "/data"
     volumes:
       - auralink_free_keys_data:/data

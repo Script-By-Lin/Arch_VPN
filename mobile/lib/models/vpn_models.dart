@@ -109,14 +109,32 @@ class VpnProfile {
     );
   }
 
+  static const Set<String> _ssConfigAllowedExtraKeys = {
+    'plugin',
+    'plugin_opts',
+    'mode',
+    'timeout',
+    'fast_open',
+    'no_delay',
+    'prefix',
+    'remarks',
+    'udp_timeout',
+    'ipv6_first',
+  };
+
   /// Generates the Shadowsocks JSON config payload passed to native sslocal / engine.
   Map<String, dynamic> toShadowsocksConfig({
     String localAddress = '127.0.0.1',
     int localPort = 1080,
     bool udpRelay = true,
   }) {
-    final map = <String, dynamic>{
-      ...extraConfig,
+    final map = <String, dynamic>{};
+    for (final entry in extraConfig.entries) {
+      if (_ssConfigAllowedExtraKeys.contains(entry.key) && entry.value != null) {
+        map[entry.key] = entry.value;
+      }
+    }
+    map.addAll({
       'server': server,
       'server_port': serverPort,
       'password': password,
@@ -124,7 +142,7 @@ class VpnProfile {
       'local_address': localAddress,
       'local_port': localPort,
       'no_delay': extraConfig['no_delay'] ?? true,
-    };
+    });
     if (prefix != null && prefix!.isNotEmpty) {
       map['prefix'] = prefix;
     }

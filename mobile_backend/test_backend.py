@@ -129,6 +129,71 @@ class TestMobileFreeKeysBackend(unittest.TestCase):
         self.assertEqual(page.status_code, 200)
         self.assertIn("AuraLink Mobile Admin", page.text)
 
+    def test_variable_key_formats_accepted(self):
+        # 1. Exact OpenKeys.net UUID-only ss:// key with query params (encryption=none, type=ws)
+        openkeys_ss = (
+            "ss://4dc0eec9-f0e1-4755-be7e-7ba628522d1b@91.99.145.207:443"
+            "?encryption=none&path=%2F&security=none&type=ws#Germany%20710%20/%20OpenKeys.net"
+        )
+        r1 = self.client.post(
+            "/api/admin/keys",
+            headers=self.admin_headers,
+            json={"raw_key": openkeys_ss, "country_code": "DE", "is_published": True},
+        )
+        self.assertEqual(r1.status_code, 201, r1.text)
+        k1 = r1.json()["key"]
+        self.assertEqual(k1["server"], "91.99.145.207")
+        self.assertEqual(k1["server_port"], 443)
+        self.assertEqual(k1["password"], "4dc0eec9-f0e1-4755-be7e-7ba628522d1b")
+        self.assertEqual(k1["method"], "none")
+        self.assertEqual(k1["label"], "Germany 710 / OpenKeys.net")
+        self.assertEqual(k1["flag"], "🇩🇪")
+
+        # 2. Plaintext SS2022 method:serverKey:userKey@host:port
+        ss2022 = "ss://2022-blake3-aes-128-gcm:srvKey==:usrKey==@198.51.100.55:8443?plugin=v2ray-plugin%3Bmode%3Dwebsocket#SS2022-DE"
+        r2 = self.client.post(
+            "/api/admin/keys",
+            headers=self.admin_headers,
+            json={"raw_key": ss2022, "country_code": "DE"},
+        )
+        self.assertEqual(r2.status_code, 201, r2.text)
+        k2 = r2.json()["key"]
+        self.assertEqual(k2["method"], "2022-blake3-aes-128-gcm")
+        self.assertEqual(k2["password"], "srvKey==:usrKey==")
+
+        # 3. vless://, trojan://, vmess:// keys
+        vless_key = "vless://4dc0eec9-f0e1-4755-be7e-7ba628522d1b@91.99.145.207:443?encryption=none&security=tls&type=ws#VLESS-DE"
+        r3 = self.client.post(
+            "/api/admin/keys",
+            headers=self.admin_headers,
+            json={"raw_key": vless_key, "country_code": "DE"},
+        )
+        self.assertEqual(r3.status_code, 201, r3.text)
+        self.assertEqual(r3.json()["key"]["source_type"], "vless")
+
+        trojan_key = "trojan://superSecretToken@203.0.113.9:443?security=tls&sni=example.com#Trojan-JP"
+        r4 = self.client.post(
+            "/api/admin/keys",
+            headers=self.admin_headers,
+            json={"raw_key": trojan_key, "country_code": "JP"},
+        )
+        self.assertEqual(r4.status_code, 201, r4.text)
+        self.assertEqual(r4.json()["key"]["source_type"], "trojan")
+
+        vmess_payload = base64.b64encode(
+            b'{"v":"2","ps":"VMess-SG","add":"198.51.100.8","port":"443","id":"11111111-2222-3333-4444-555555555555","scy":"auto"}'
+        ).decode()
+        r5 = self.client.post(
+            "/api/admin/keys",
+            headers=self.admin_headers,
+            json={"raw_key": f"vmess://{vmess_payload}", "country_code": "SG"},
+        )
+        self.assertEqual(r5.status_code, 201, r5.text)
+        k5 = r5.json()["key"]
+        self.assertEqual(k5["source_type"], "vmess")
+        self.assertEqual(k5["label"], "VMess-SG")
+        self.assertEqual(k5["server"], "198.51.100.8")
+
     def test_mobile_apk_release_link_and_upload(self):
         # 1. Initially unavailable
         r0 = self.client.get("/api/mobile/release")
@@ -179,6 +244,39 @@ class TestMobileFreeKeysBackend(unittest.TestCase):
         d = self.client.delete("/api/admin/mobile-release", headers=self.admin_headers)
         self.assertEqual(d.status_code, 200)
         self.assertFalse(self.client.get("/api/mobile/release").json()["available"])
+
+    def test_postgres_url_resolution_and_redaction(self):
+        from mobile_backend.database import (
+            is_postgres_url,
+            normalize_postgres_url,
+            redact_database_url,
+            resolve_database_url,
+        )
+
+        self.assertTrue(is_postgres_url("postgres://user:secret@host:5432/railway"))
+        self.assertTrue(is_postgres_url("postgresql://user:secret@host:5432/railway?sslmode=require"))
+        self.assertFalse(is_postgres_url("/tmp/free_keys.db"))
+
+        norm = normalize_postgres_url("postgres://user:supersecret@pg.railway.internal:5432/railway")
+        self.assertEqual(norm, "postgresql://user:supersecret@pg.railway.internal:5432/railway")
+        redacted = redact_database_url(norm)
+        self.assertNotIn("supersecret", redacted)
+        self.assertIn("pg.railway.internal:5432/railway", redacted)
+
+        # Explicit SQLite file path overrides env DATABASE_URL for isolated tests
+        prev = os.environ.get("DATABASE_URL")
+        try:
+            os.environ["DATABASE_URL"] = "postgres://u:p@localhost:5432/db"
+            self.assertIsNone(resolve_database_url(db_path="/tmp/local.db"))
+            self.assertEqual(
+                resolve_database_url(),
+                "postgresql://u:p@localhost:5432/db",
+            )
+        finally:
+            if prev is None:
+                os.environ.pop("DATABASE_URL", None)
+            else:
+                os.environ["DATABASE_URL"] = prev
 
 
 if __name__ == "__main__":

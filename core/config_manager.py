@@ -6,6 +6,7 @@ injecting local_address/local_port, and persistent profile management.
 """
 
 import os
+import re
 import sys
 import json
 import uuid
@@ -235,113 +236,289 @@ class ConfigManager:
 
         return data
 
+    @staticmethod
+    def _b64_decode_flexible(data: str) -> str:
+        s = data.strip().replace("-", "+").replace("_", "/")
+        rem = len(s) % 4
+        if rem != 0:
+            s += "=" * (4 - rem)
+        return base64.b64decode(s).decode("utf-8")
+
+    @staticmethod
+    def _parse_query_params(query_str: str) -> Dict[str, str]:
+        params: Dict[str, str] = {}
+        if not query_str:
+            return params
+        for k, vals in urllib.parse.parse_qs(query_str, keep_blank_values=True).items():
+            if vals:
+                params[k] = vals[0]
+        return params
+
+    @staticmethod
+    def _split_host_port(hostport: str, default_port: int = 8388) -> Tuple[str, int]:
+        hp = hostport.strip().split("?", 1)[0].strip().rstrip("/")
+        if hp.startswith("["):
+            close_idx = hp.find("]")
+            if close_idx == -1:
+                raise ConfigError(f"Malformed IPv6 host: {hp}")
+            host = hp[1:close_idx]
+            rest = hp[close_idx + 1 :]
+            port_str = rest[1:].split("/")[0] if rest.startswith(":") else str(default_port)
+            port = int(port_str) if port_str else default_port
+            if port <= 0 or port > 65535:
+                raise ConfigError(f"Invalid server port: {port}")
+            return host, port
+        if ":" not in hp:
+            return hp.split("/")[0].strip(), default_port
+        host, port_str = hp.rsplit(":", 1)
+        host = host.strip()
+        port_str = port_str.split("/")[0].strip()
+        port = int(port_str) if port_str else default_port
+        if port <= 0 or port > 65535:
+            raise ConfigError(f"Invalid server port: {port}")
+        return host, port
+
+    @classmethod
+    def _extract_ss_credentials(cls, userinfo: str, params: Dict[str, str]) -> Tuple[str, str]:
+        raw = userinfo.strip()
+        if ":" in raw:
+            raw_m, raw_p = raw.split(":", 1)
+            return urllib.parse.unquote(raw_m).strip(), urllib.parse.unquote(raw_p)
+        unquoted = urllib.parse.unquote(raw)
+        if ":" in unquoted:
+            m, p = unquoted.split(":", 1)
+            return m.strip(), p
+        try:
+            decoded = cls._b64_decode_flexible(raw)
+            if ":" in decoded and all((32 <= ord(ch) <= 126) or ord(ch) >= 160 for ch in decoded):
+                cand_m, cand_p = decoded.split(":", 1)
+                if cand_m and cand_p and re.fullmatch(r"[A-Za-z0-9._-]+", cand_m):
+                    return cand_m, cand_p
+        except Exception:
+            pass
+        method = (
+            params.get("method")
+            or params.get("cipher")
+            or params.get("encryption")
+            or "chacha20-ietf-poly1305"
+        ).strip()
+        return method or "chacha20-ietf-poly1305", unquoted
+
     def parse_key(self, raw_input: str) -> Dict[str, Any]:
         """
-        Parses ssconf://, ss://, https://, raw JSON, or local file.
-        Returns a profile dict:
-        {
-            "id": "...",
-            "name": "...",
-            "raw_key": "...",
-            "source_type": "ssconf" | "ss" | "json" | "url",
-            "config": { ... shadowsocks json with local_address/port ... },
-            "server": "...",
-            "server_port": 443,
-            "method": "...",
-            "password": "..."
-        }
+        Parses ssconf://, ss:// (SIP002, legacy base64, plaintext, SS2022, or bare UUID+query),
+        vless://, trojan://, vmess://, ssr://, https://, raw JSON, or local file.
+        Returns a profile dict.
         """
         raw_input = raw_input.strip()
         if not raw_input:
             raise ConfigError("Key / URL cannot be empty.")
+
+        if not raw_input.startswith("{") and not os.path.exists(raw_input):
+            raw_input = re.sub(r"[\r\n]+", "", raw_input).strip()
 
         settings = self.get_settings()
         local_addr = settings.get("socks_host", "127.0.0.1")
         local_port = int(settings.get("socks_port", 1080))
 
         profile_name = "Shadowsocks Server"
-        config_data = {}
+        config_data: Dict[str, Any] = {}
+        uri_params: Dict[str, str] = {}
         source_type = "unknown"
+        lower = raw_input.lower()
 
         # 1. ssconf:// schema
-        if raw_input.startswith("ssconf://"):
+        if lower.startswith("ssconf://"):
             source_type = "ssconf"
-            # Remove ssconf://
             url_part = raw_input[len("ssconf://"):]
-            
-            # Extract profile name from # anchor if present
             if "#" in url_part:
                 target_url, tag = url_part.split("#", 1)
-                profile_name = urllib.parse.unquote(tag)
+                profile_name = urllib.parse.unquote(tag).strip()
             else:
                 target_url = url_part
                 profile_name = "AuraLink Server"
 
-            # Prepend https:// if not present
-            if not target_url.startswith("http://") and not target_url.startswith("https://"):
+            if not target_url.lower().startswith(("http://", "https://")):
                 target_url = "https://" + target_url
 
             config_data = self.fetch_url_json(target_url)
 
         # 2. http:// or https:// schema
-        elif raw_input.startswith("http://") or raw_input.startswith("https://"):
+        elif lower.startswith(("http://", "https://")):
             source_type = "url"
             url_part = raw_input
             if "#" in url_part:
                 target_url, tag = url_part.split("#", 1)
-                profile_name = urllib.parse.unquote(tag)
+                profile_name = urllib.parse.unquote(tag).strip()
             else:
                 target_url = url_part
                 profile_name = urllib.parse.urlparse(target_url).netloc
 
             config_data = self.fetch_url_json(target_url)
 
-        # 3. Standard ss:// URI schema (SIP002)
-        elif raw_input.startswith("ss://"):
+        # 3. Flexible ss:// URI schema (SIP002, legacy base64, plaintext, SS2022, bare UUID + query)
+        elif lower.startswith("ss://"):
             source_type = "ss"
-            uri_body = raw_input[5:]
+            uri_body = raw_input[5:].strip()
             if "#" in uri_body:
                 main_part, tag = uri_body.split("#", 1)
-                profile_name = urllib.parse.unquote(tag)
+                profile_name = urllib.parse.unquote(tag).strip() or profile_name
             else:
                 main_part = uri_body
 
-            # Handle base64 encoded userinfo vs unencoded
-            if "@" in main_part:
-                userinfo, hostport = main_part.split("@", 1)
-                try:
-                    padding = 4 - (len(userinfo) % 4)
-                    if padding != 4:
-                        userinfo += "=" * padding
-                    decoded_userinfo = base64.urlsafe_b64decode(userinfo).decode("utf-8")
-                    method, password = decoded_userinfo.split(":", 1)
-                except Exception:
-                    method, password = userinfo.split(":", 1)
+            if "?" in main_part:
+                main_part, q = main_part.split("?", 1)
+                uri_params = self._parse_query_params(q)
 
-                if ":" in hostport:
-                    server, port_str = hostport.split(":", 1)
-                    server_port = int(port_str.split("/")[0].split("?")[0])
-                else:
-                    server = hostport
-                    server_port = 8388
+            if "@" in main_part:
+                userinfo, hostport = main_part.rsplit("@", 1)
+                method, password = self._extract_ss_credentials(userinfo, uri_params)
+                server, server_port = self._split_host_port(hostport, default_port=8388)
             else:
-                padding = 4 - (len(main_part) % 4)
-                if padding != 4:
-                    main_part += "=" * padding
-                decoded = base64.urlsafe_b64decode(main_part).decode("utf-8")
-                userinfo, hostport = decoded.split("@", 1)
-                method, password = userinfo.split(":", 1)
-                server, port_str = hostport.split(":", 1)
-                server_port = int(port_str.split("/")[0].split("?")[0])
+                try:
+                    decoded = self._b64_decode_flexible(main_part)
+                except Exception as e:
+                    raise ConfigError(f"Invalid legacy ss:// base64 payload: {e}") from e
+                if "#" in decoded and profile_name == "Shadowsocks Server":
+                    decoded, tag = decoded.split("#", 1)
+                    profile_name = urllib.parse.unquote(tag).strip() or profile_name
+                if "?" in decoded:
+                    decoded, q2 = decoded.split("?", 1)
+                    uri_params = {**self._parse_query_params(q2), **uri_params}
+                if "@" not in decoded:
+                    raise ConfigError("Invalid legacy ss:// base64 payload.")
+                userinfo, hostport = decoded.rsplit("@", 1)
+                method, password = self._extract_ss_credentials(userinfo, uri_params)
+                server, server_port = self._split_host_port(hostport, default_port=8388)
+
+            if profile_name == "Shadowsocks Server" and server:
+                profile_name = server
 
             config_data = {
                 "server": server,
                 "server_port": server_port,
                 "password": password,
-                "method": method
+                "method": method or "chacha20-ietf-poly1305",
+            }
+            if uri_params.get("prefix"):
+                config_data["prefix"] = uri_params["prefix"]
+            raw_plugin = (uri_params.get("plugin") or "").strip()
+            if raw_plugin:
+                if ";" in raw_plugin:
+                    p_name, p_opts = raw_plugin.split(";", 1)
+                    config_data["plugin"] = p_name.strip()
+                    config_data["plugin_opts"] = p_opts.strip()
+                else:
+                    config_data["plugin"] = raw_plugin
+
+        # 4. vless:// and trojan:// URI schemas
+        elif lower.startswith(("vless://", "trojan://")):
+            scheme = "vless" if lower.startswith("vless://") else "trojan"
+            source_type = scheme
+            uri_body = raw_input[len(scheme) + 3 :].strip()
+            profile_name = "VLESS Server" if scheme == "vless" else "Trojan Server"
+            if "#" in uri_body:
+                main_part, tag = uri_body.split("#", 1)
+                profile_name = urllib.parse.unquote(tag).strip() or profile_name
+            else:
+                main_part = uri_body
+            if "?" in main_part:
+                main_part, q = main_part.split("?", 1)
+                uri_params = self._parse_query_params(q)
+            if "@" not in main_part:
+                raise ConfigError(f"Invalid {scheme}:// URI: missing credentials.")
+            userinfo, hostport = main_part.rsplit("@", 1)
+            password = urllib.parse.unquote(userinfo).strip()
+            server, server_port = self._split_host_port(hostport, default_port=443)
+            method = (
+                uri_params.get("encryption")
+                or uri_params.get("method")
+                or uri_params.get("security")
+                or scheme
+            ).strip() or scheme
+            if profile_name in ("VLESS Server", "Trojan Server") and server:
+                profile_name = server
+            config_data = {
+                "server": server,
+                "server_port": server_port,
+                "password": password,
+                "method": method,
             }
 
-        # 4. JSON string or file path
+        # 5. vmess:// URI schema
+        elif lower.startswith("vmess://"):
+            source_type = "vmess"
+            uri_body = raw_input[8:].strip()
+            profile_name = "VMess Server"
+            if "#" in uri_body:
+                uri_body, tag = uri_body.split("#", 1)
+                profile_name = urllib.parse.unquote(tag).strip() or profile_name
+            if "@" not in uri_body:
+                try:
+                    obj = json.loads(self._b64_decode_flexible(uri_body))
+                except Exception as e:
+                    raise ConfigError(f"Invalid vmess:// base64 JSON payload: {e}") from e
+                server = str(obj.get("add") or obj.get("server") or "").strip()
+                password = str(obj.get("id") or obj.get("password") or "").strip()
+                server_port = int(obj.get("port") or 443)
+                method = str(obj.get("scy") or obj.get("cipher") or "auto").strip() or "auto"
+                profile_name = str(obj.get("ps") or profile_name).strip() or server
+                uri_params = {k: str(v) for k, v in obj.items() if v is not None}
+            else:
+                if "?" in uri_body:
+                    uri_body, q = uri_body.split("?", 1)
+                    uri_params = self._parse_query_params(q)
+                userinfo, hostport = uri_body.rsplit("@", 1)
+                password = urllib.parse.unquote(userinfo).strip()
+                server, server_port = self._split_host_port(hostport, default_port=443)
+                method = (uri_params.get("encryption") or uri_params.get("cipher") or "auto").strip() or "auto"
+                if profile_name == "VMess Server" and server:
+                    profile_name = server
+            config_data = {
+                "server": server,
+                "server_port": server_port,
+                "password": password,
+                "method": method,
+            }
+
+        # 6. ssr:// URI schema
+        elif lower.startswith("ssr://"):
+            source_type = "ssr"
+            try:
+                decoded = self._b64_decode_flexible(raw_input[6:].strip())
+            except Exception as e:
+                raise ConfigError(f"Invalid ssr:// base64 payload: {e}") from e
+            main_part = decoded
+            if "/?" in decoded:
+                main_part, q = decoded.split("/?", 1)
+                uri_params = self._parse_query_params(q)
+            elif "?" in decoded:
+                main_part, q = decoded.split("?", 1)
+                uri_params = self._parse_query_params(q)
+            parts = main_part.split(":")
+            if len(parts) < 6:
+                raise ConfigError("Invalid ssr:// payload structure.")
+            server = parts[0].strip()
+            server_port = int(parts[1])
+            method = parts[3].strip() or "chacha20-ietf-poly1305"
+            try:
+                password = self._b64_decode_flexible(parts[5])
+            except Exception:
+                password = parts[5]
+            profile_name = server
+            if uri_params.get("remarks"):
+                try:
+                    profile_name = self._b64_decode_flexible(uri_params["remarks"]).strip() or server
+                except Exception:
+                    profile_name = uri_params["remarks"].strip() or server
+            config_data = {
+                "server": server,
+                "server_port": server_port,
+                "password": password,
+                "method": method,
+            }
+
+        # 7. JSON string or file path
         elif raw_input.startswith("{") or os.path.exists(raw_input):
             source_type = "json"
             if os.path.exists(raw_input):
@@ -349,16 +526,27 @@ class ConfigManager:
                     config_data = json.load(f)
             else:
                 config_data = json.loads(raw_input)
-            profile_name = config_data.get("remarks", config_data.get("server", "Custom JSON Server"))
+            profile_name = config_data.get(
+                "remarks",
+                config_data.get("ps", config_data.get("server", config_data.get("add", "Custom JSON Server"))),
+            )
+            if "server" not in config_data and "add" in config_data:
+                config_data["server"] = config_data["add"]
+            if "password" not in config_data and "id" in config_data:
+                config_data["password"] = config_data["id"]
+            if "server_port" not in config_data and "port" in config_data:
+                config_data["server_port"] = config_data["port"]
         else:
-            raise ConfigError(f"Unrecognized format. Expected ssconf://..., ss://..., https://..., or JSON.")
+            raise ConfigError(
+                "Unrecognized format. Expected ss://, vless://, trojan://, vmess://, ssr://, ssconf://, https://, or JSON."
+            )
 
         # Validate config_data
         if not isinstance(config_data, dict):
             raise ConfigError("Invalid configuration structure received.")
 
-        if "server" not in config_data or "password" not in config_data:
-            raise ConfigError("Shadowsocks configuration missing required fields (server, password).")
+        if not config_data.get("server") or not config_data.get("password"):
+            raise ConfigError("VPN configuration missing required fields (server, password).")
 
         # Inject local_address and local_port
         config_data["local_address"] = local_addr
@@ -373,7 +561,8 @@ class ConfigManager:
             "server_port": int(config_data.get("server_port", 443)),
             "method": config_data.get("method", "chacha20-ietf-poly1305"),
             "prefix": config_data.get("prefix", None),
-            "config": config_data
+            "params": uri_params,
+            "config": config_data,
         }
 
         return profile

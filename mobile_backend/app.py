@@ -49,7 +49,7 @@ def _load_or_create_admin_token() -> str:
 
 
 class CreateFreeKeyRequest(BaseModel):
-    raw_key: str = Field(..., min_length=5, description="ss://, ssconf://, https://, or Shadowsocks JSON")
+    raw_key: str = Field(..., min_length=5, description="ss://, vless://, trojan://, vmess://, ssr://, ssconf://, https://, or JSON")
     country_code: str = Field(..., min_length=2, max_length=3, description="ISO 2-letter country code, e.g. JP, SG, US")
     region: Optional[str] = Field(None, description="Display region name, e.g. Japan, Singapore")
     city: str = Field("", max_length=64, description="Optional city name, e.g. Tokyo")
@@ -86,8 +86,12 @@ def _public_base_url(request: Request) -> str:
     return f"{proto}://{host}".rstrip("/")
 
 
-def create_app(db_path: Optional[str] = None, admin_token: Optional[str] = None) -> FastAPI:
-    db = FreeKeysDB(db_path=db_path)
+def create_app(
+    db_path: Optional[str] = None,
+    admin_token: Optional[str] = None,
+    database_url: Optional[str] = None,
+) -> FastAPI:
+    db = FreeKeysDB(db_path=db_path, database_url=database_url)
     resolved_token = admin_token or _load_or_create_admin_token()
 
     app = FastAPI(
@@ -134,6 +138,7 @@ def create_app(db_path: Optional[str] = None, admin_token: Optional[str] = None)
             "status": "ok",
             "service": "auralink-mobile-free-keys",
             "scope": "mobile-only",
+            "database": db.backend_type,
             "published_free_keys": len(published),
         }
 
@@ -313,7 +318,7 @@ def create_app(db_path: Optional[str] = None, admin_token: Optional[str] = None)
         if not safe_name.lower().endswith(".apk"):
             safe_name += ".apk"
 
-        releases_dir = os.path.join(os.path.dirname(os.path.abspath(db.db_path)), "releases")
+        releases_dir = db.releases_dir
         os.makedirs(releases_dir, exist_ok=True)
         tmp_path = os.path.join(releases_dir, f".{safe_name}.tmp")
         final_path = os.path.join(releases_dir, safe_name)

@@ -6,7 +6,7 @@ connect button, interactive live tunnel pipeline model, live speed sparklines,
 DNS upstream selector, real-time log stream, and complete server management.
 """
 
-import html
+import html , json
 import math
 import os
 import re
@@ -349,7 +349,7 @@ class CircularConnectButton(QPushButton):
             icon_color = QColor("#D97706")
             icon_bg = QColor(245, 158, 11, 28)
             text_color = QColor("#B45309")
-            sub_text = "CONNECTING..." if self._state == STATE_CONNECTING else "DISCONNECTING..."
+            sub_text = "CONNECTING • CANCEL" if self._state == STATE_CONNECTING else "DISCONNECTING..."
         elif self._state == STATE_ERROR:
             grad_start = QColor("#FFFFFF")
             grad_end = QColor("#FEF2F2")
@@ -685,6 +685,9 @@ class InteractiveTunnelModelWidget(QFrame):
                 if idx in (1, 2, 3): return "active"
                 if idx == 0: return "connecting"
                 return "active"
+            elif stage == "verifying":
+                if idx in (0, 1, 2): return "active"
+                return "connecting"
             return "connecting"
 
         # STATE_DISCONNECTED
@@ -713,6 +716,8 @@ class InteractiveTunnelModelWidget(QFrame):
                 return "active" if seg_idx in (1, 2) else ("connecting" if seg_idx == 0 else "inactive")
             elif stage == "routing":
                 return "active"
+            elif stage == "verifying":
+                return "connecting"
             return "connecting"
 
         return "inactive"
@@ -734,6 +739,8 @@ class InteractiveTunnelModelWidget(QFrame):
                 rx_str = self._meta.get("rx_speed_str", "0 B/s")
                 tx_str = self._meta.get("tx_speed_str", "0 B/s")
                 return f"Linux Apps • 100% Full-Tunnel Captured • DNS {self._meta.get('dns', '1.1.1.1')} • Live: ↓ {rx_str}  ↑ {tx_str}"
+            elif is_busy and self._stage == "verifying":
+                return "Linux Apps • Verifying real internet & DNS reachability through tun0..."
             elif is_busy:
                 return f"Linux Apps • Preparing kernel default route redirect -> tun0 (10.0.0.2/24)"
             else:
@@ -772,6 +779,8 @@ class InteractiveTunnelModelWidget(QFrame):
 
         if is_conn:
             return f"VPN Node • {prof_name} ({srv}:{port}) • Latency: {ping_str} • Uptime: {dur}"
+        elif is_busy and self._stage == "verifying":
+            return f"VPN Node • Probing internet & DNS traffic via {prof_name} ({srv}:{port})..."
         elif is_busy:
             return f"VPN Node • Resolving {srv} & handshaking via physical gateway..."
         else:
@@ -800,14 +809,17 @@ class InteractiveTunnelModelWidget(QFrame):
             badge_color = QColor("#059669")
         elif self._state == STATE_CONNECTING:
             stage = self._stage
+            total = self._stage_info.get("stage_total", 5) if isinstance(self._stage_info, dict) else 5
             if stage == "resolving":
-                badge_text = "1/4: RESOLVING NODE"
+                badge_text = f"1/{total}: RESOLVING NODE"
             elif stage == "sslocal":
-                badge_text = "2/4: SOCKS5 CORE"
+                badge_text = f"2/{total}: SOCKS5 CORE"
             elif stage == "tun0":
-                badge_text = "3/4: TUNNEL ARMED"
+                badge_text = f"3/{total}: TUNNEL ARMED"
             elif stage == "routing":
-                badge_text = "4/4: SECURING ROUTES"
+                badge_text = f"4/{total}: ROUTES & DNS"
+            elif stage == "verifying":
+                badge_text = f"5/{total}: VERIFYING NET"
             else:
                 badge_text = "HANDSHAKE"
             badge_color = QColor("#D97706")
@@ -1528,6 +1540,7 @@ class MainWindow(QMainWindow):
         self.service.add_listener(self._service_listener)
         self.updating_combo = False
         self._last_ping_ms: Optional[int] = None
+        self._last_verify_info: Dict[str, Any] = {}
 
         self.init_ui()
         self.init_tray()
@@ -1549,6 +1562,10 @@ class MainWindow(QMainWindow):
             self.signals.log_message.emit(f"[{event_type.upper()}] {msg}")
         elif err:
             self.signals.log_message.emit(f"[ERROR] {err}")
+
+        if event_type == "connected" and data.get("verify_detail"):
+            tag = "VERIFY" if data.get("verified", True) else "WARN"
+            self.signals.log_message.emit(f"[{tag}] {data['verify_detail']}")
 
     def _apply_soft_shadow(self, widget: QWidget, blur: int = 20, alpha: int = 22):
         shadow = QGraphicsDropShadowEffect(self)
@@ -2184,6 +2201,11 @@ class MainWindow(QMainWindow):
             self.tunnel_model.trigger_disconnect_modeling()
             self.append_ui_log("[DISCONNECT] Terminating tun0 interface...")
             threading.Thread(target=self.service.disconnect, daemon=True).start()
+        elif state == STATE_CONNECTING:
+            self.btn_circular.trigger_click_effect(is_disconnect=True)
+            self.tunnel_model.trigger_disconnect_modeling()
+            self.append_ui_log("[CANCEL] Cancelling in-flight connection...")
+            self.service.cancel_connect()
         elif state in (STATE_DISCONNECTED, STATE_ERROR):
             profiles = self.service.config_mgr.get_profiles()
             if not profiles:
@@ -2195,6 +2217,10 @@ class MainWindow(QMainWindow):
             threading.Thread(target=self.service.connect, daemon=True).start()
 
     def on_state_changed(self, event_type: str, data: dict):
+        if event_type == "connected":
+            self._last_verify_info = dict(data or {})
+        elif event_type in ("disconnected", "error"):
+            self._last_verify_info = {}
         self.refresh_ui_state()
 
     def on_stage_changed(self, stage_data: dict):
@@ -2280,8 +2306,15 @@ class MainWindow(QMainWindow):
 
             self.btn_circular.set_vpn_state(STATE_CONNECTED)
             ipv6_tag = "IPv6 disabled" if ipv6_off else "IPv6 active"
-            self.lbl_route_status.setText(f"Virtual tun0 active • {ipv6_tag} • routed via {prof_name}")
-            self.lbl_route_status.setStyleSheet("font-size: 11px; color: #047857; font-family: monospace; font-weight: 600; margin-top: 4px;")
+            v_info = getattr(self, "_last_verify_info", {}) or {}
+            if v_info.get("verified") is False:
+                self.lbl_route_status.setText(f"Virtual tun0 active • {ipv6_tag} • probe timed out (check {prof_name})")
+                self.lbl_route_status.setStyleSheet("font-size: 11px; color: #B45309; font-family: monospace; font-weight: 600; margin-top: 4px;")
+            else:
+                v_lat = v_info.get("verify_latency_ms")
+                lat_part = f" • verified {v_lat}ms" if isinstance(v_lat, int) else ""
+                self.lbl_route_status.setText(f"Virtual tun0 active • {ipv6_tag}{lat_part} • routed via {prof_name}")
+                self.lbl_route_status.setStyleSheet("font-size: 11px; color: #047857; font-family: monospace; font-weight: 600; margin-top: 4px;")
 
             # Trigger immediate stats update if already connected
             st = self.service.stats_monitor.get_stats()

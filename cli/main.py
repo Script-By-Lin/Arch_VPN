@@ -54,16 +54,24 @@ def cmd_connect(args, service: VPNService):
         msg = data.get("message", "")
         if event_type == "progress":
             print(f"  {DIM}→{RESET} {msg}")
+        elif event_type == "stage_changed":
+            lbl = data.get("stage_label", "")
+            print(f"  {CYAN}→{RESET} {BOLD}{lbl}{RESET}: {msg}" if lbl else f"  {DIM}→{RESET} {msg}")
         elif event_type == "connected":
             print(f"{GREEN}{BOLD}[✓] Connected successfully!{RESET}")
             prof = data.get("profile", {})
             print(f"    Profile : {BOLD}{prof.get('name')}{RESET}")
             print(f"    Server  : {prof.get('server')}:{prof.get('server_port')}")
             print(f"    TUN Dev : {data.get('tun_dev')}")
+            if data.get("udp_relay", True):
+                print(f"    Mode    : {GREEN}TCP + UDP Relay (Fast DNS / QUIC){RESET}")
             if data.get("ipv6_disabled"):
                 print(f"    IPv6    : {GREEN}Disabled (Leak Protected){RESET}")
             else:
                 print(f"    IPv6    : {YELLOW}Enabled{RESET}")
+            if data.get("verify_detail"):
+                v_col = GREEN if data.get("verified", True) else YELLOW
+                print(f"    Tunnel  : {v_col}{data.get('verify_detail')}{RESET}")
         elif event_type == "error":
             print(f"{RED}{BOLD}[✗] Connection failed:{RESET} {data.get('error')}")
 

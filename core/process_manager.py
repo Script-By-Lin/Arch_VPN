@@ -13,6 +13,7 @@ import signal
 import subprocess
 import shutil
 import re
+import threading
 from typing import Optional, List, Tuple, Generator
 
 STATE_DIR = os.path.expanduser("~/.config/auralink/state")
@@ -61,18 +62,24 @@ class ProcessManager:
         except (OSError, ProcessLookupError):
             return False
 
-    def wait_for_port(self, host: str, port: int, timeout: float = 6.0) -> bool:
-        """Polls until TCP port is accepting connections or timeout expires."""
+    def wait_for_port(self, host: str, port: int, timeout: float = 6.0, cancel_event: Optional[threading.Event] = None) -> bool:
+        """Polls until TCP port is accepting connections or timeout/cancel expires."""
         start_time = time.time()
         while time.time() - start_time < timeout:
+            if cancel_event and cancel_event.is_set():
+                return False
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.settimeout(0.5)
+            s.settimeout(0.25)
             try:
                 s.connect((host, port))
                 s.close()
                 return True
             except (socket.error, ConnectionRefusedError):
-                time.sleep(0.2)
+                if cancel_event:
+                    if cancel_event.wait(0.05):
+                        return False
+                else:
+                    time.sleep(0.05)
             finally:
                 try:
                     s.close()
@@ -80,7 +87,7 @@ class ProcessManager:
                     pass
         return False
 
-    def start_sslocal(self, config_path: str, host: str = "127.0.0.1", port: int = 1080) -> int:
+    def start_sslocal(self, config_path: str, host: str = "127.0.0.1", port: int = 1080, cancel_event: Optional[threading.Event] = None) -> int:
         """Starts sslocal daemon with the given config."""
         sslocal_bin = shutil.which("sslocal")
         if not sslocal_bin:
@@ -102,18 +109,19 @@ class ProcessManager:
             raise ProcessError(f"Failed to start sslocal: {e}")
 
         # Wait for local port to become ready
-        if not self.wait_for_port(host, port, timeout=5.0):
+        if not self.wait_for_port(host, port, timeout=5.0, cancel_event=cancel_event):
+            log_f.close()
+            if cancel_event and cancel_event.is_set():
+                return proc.pid
             if proc.poll() is not None:
-                log_f.close()
                 with open(self.sslocal_log, "r", encoding="utf-8", errors="ignore") as f:
                     err_lines = f.read()
                 raise ProcessError(f"sslocal exited prematurely (code {proc.returncode}):\n{err_lines[-300:]}")
-            log_f.close()
             raise ProcessError(f"sslocal started but failed to listen on {host}:{port} within timeout.")
 
         return proc.pid
 
-    def start_tun2socks(self, tun_device: str = "tun0", proxy_url: str = "socks5://127.0.0.1:1080", restapi_addr: str = "127.0.0.1:17070") -> int:
+    def start_tun2socks(self, tun_device: str = "tun0", proxy_url: str = "socks5://127.0.0.1:1080", restapi_addr: str = "127.0.0.1:17070", cancel_event: Optional[threading.Event] = None) -> int:
         """Starts tun2socks process with sudo."""
         tun2socks_bin = shutil.which("tun2socks") or "/usr/local/bin/tun2socks"
         if not os.path.exists(tun2socks_bin) and not shutil.which("tun2socks"):
@@ -146,7 +154,31 @@ class ProcessManager:
             log_f.close()
             raise ProcessError(f"Failed to start tun2socks: {e}")
 
-        time.sleep(0.8)
+        # Poll rapidly for tun2socks readiness instead of a blind 0.8s sleep
+        deadline = time.time() + 0.65
+        min_ready_at = time.time() + 0.20
+        while time.time() < deadline:
+            if cancel_event and cancel_event.is_set():
+                log_f.close()
+                return proc.pid
+            if proc.poll() is not None:
+                log_f.close()
+                with open(self.tun2socks_log, "r", encoding="utf-8", errors="ignore") as f:
+                    err_lines = f.read()
+                raise ProcessError(f"tun2socks exited prematurely (code {proc.returncode}):\n{err_lines[-300:]}")
+            if time.time() >= min_ready_at:
+                try:
+                    if os.path.exists(self.tun2socks_log) and os.path.getsize(self.tun2socks_log) > 0:
+                        break
+                except OSError:
+                    pass
+            if cancel_event:
+                if cancel_event.wait(0.05):
+                    log_f.close()
+                    return proc.pid
+            else:
+                time.sleep(0.05)
+
         if proc.poll() is not None:
             log_f.close()
             with open(self.tun2socks_log, "r", encoding="utf-8", errors="ignore") as f:
@@ -160,7 +192,10 @@ class ProcessManager:
         if pid and self.is_pid_alive(pid):
             try:
                 os.killpg(os.getpgid(pid), signal.SIGTERM)
-                time.sleep(0.3)
+                for _ in range(6):
+                    if not self.is_pid_alive(pid):
+                        break
+                    time.sleep(0.05)
                 if self.is_pid_alive(pid):
                     os.killpg(os.getpgid(pid), signal.SIGKILL)
             except Exception:

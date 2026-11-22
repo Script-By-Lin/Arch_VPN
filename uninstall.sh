@@ -87,19 +87,35 @@ pkill -x "tun2socks" 2>/dev/null || true
 pkill -f "sslocal -c .*auralink" 2>/dev/null || true
 pkill -f "sslocal -c .*shadowtun" 2>/dev/null || true
 
-# Safety cleanup if a dangling tun0 interface remains
+# Safety cleanup if a dangling tun0 interface, DNS override, or IPv6 block remains
 if command -v ip >/dev/null 2>&1 && ip link show tun0 >/dev/null 2>&1; then
   if command -v resolvectl >/dev/null 2>&1; then
     resolvectl revert tun0 2>/dev/null || true
+    resolvectl flush-caches 2>/dev/null || true
   elif command -v systemd-resolve >/dev/null 2>&1; then
     systemd-resolve --revert -i tun0 2>/dev/null || true
+    systemd-resolve --flush-caches 2>/dev/null || true
+  fi
+  if command -v resolvconf >/dev/null 2>&1; then
+    resolvconf -d "tun0.auralink" 2>/dev/null || true
   fi
   ip route del default dev tun0 2>/dev/null || true
   ip link delete tun0 2>/dev/null || true
   if [[ -w /proc/sys/net/ipv6/conf/all/disable_ipv6 ]]; then
     echo 0 > /proc/sys/net/ipv6/conf/all/disable_ipv6 2>/dev/null || true
     echo 0 > /proc/sys/net/ipv6/conf/default/disable_ipv6 2>/dev/null || true
+    for ipv6_file in /proc/sys/net/ipv6/conf/*/disable_ipv6; do
+      [[ -w "$ipv6_file" ]] && echo 0 > "$ipv6_file" 2>/dev/null || true
+    done
   fi
+fi
+
+# Always restore backed-up /etc/resolv.conf if left behind on non-systemd distros
+if [[ -f /run/auralink-resolv.conf.bak ]]; then
+  mv -f /run/auralink-resolv.conf.bak /etc/resolv.conf 2>/dev/null || true
+fi
+if command -v resolvectl >/dev/null 2>&1; then
+  resolvectl flush-caches 2>/dev/null || true
 fi
 
 echo -e "${YELLOW}[*] Removing installed files and links...${RESET}"
@@ -142,6 +158,10 @@ if [[ "$PURGE_CONFIG" == true ]]; then
       fi
     done
   fi
+  # Also clean any remaining user configs if invoked directly as root without SUDO_USER
+  for cfg_dir in /home/*/.config/auralink /home/*/.config/shadowtun; do
+    [[ -d "$cfg_dir" ]] && rm -rf "$cfg_dir"
+  done
   rm -rf /root/.config/auralink /root/.config/shadowtun
   echo -e "${GREEN}${BOLD}[✓] AuraLink VPN and all user configs have been cleanly uninstalled.${RESET}"
 else

@@ -62,6 +62,9 @@ class ConfigManager:
                 "tun_device": "tun0",
                 "tun_ip": "10.0.0.2/24",
                 "disable_ipv6": True,
+                "udp_relay": True,
+                "verify_tunnel": True,
+                "verify_timeout": 12.0,
                 "auto_reconnect": True,
                 "killswitch": True,
                 "active_profile_id": None
@@ -86,6 +89,9 @@ class ConfigManager:
             "tun_device": "tun0",
             "tun_ip": "10.0.0.2/24",
             "disable_ipv6": True,
+            "udp_relay": True,
+            "verify_tunnel": True,
+            "verify_timeout": 12.0,
             "auto_reconnect": True,
             "killswitch": True,
             "active_profile_id": None
@@ -378,8 +384,17 @@ class ConfigManager:
         settings = self.get_settings()
         config_data["local_address"] = settings.get("socks_host", "127.0.0.1")
         config_data["local_port"] = int(settings.get("socks_port", 1080))
-        
+
+        # Enable TCP+UDP relay so UDP DNS (port 53) and QUIC/HTTP3 work immediately
+        # without waiting 5-10s for systemd-resolved UDP->TCP fallback timeouts.
+        if settings.get("udp_relay", True) and "mode" not in config_data:
+            config_data["mode"] = "tcp_and_udp"
+
+        # Enable TCP_NODELAY for snappier TLS/DNS handshakes
+        if "no_delay" not in config_data:
+            config_data["no_delay"] = True
+
         with open(ACTIVE_CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(config_data, f, indent=2, ensure_ascii=False)
-            
+
         return ACTIVE_CONFIG_FILE

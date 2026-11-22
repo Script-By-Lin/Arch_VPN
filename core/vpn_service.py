@@ -27,6 +27,11 @@ STATE_ERROR = "ERROR"
 SESSION_FILE = os.path.expanduser("~/.config/auralink/state/session.json")
 
 
+class _ConnectionCancelled(Exception):
+    """Internal control-flow signal when user cancels an in-flight connection."""
+    pass
+
+
 class VPNService:
     def __init__(self):
         self.config_mgr = ConfigManager()
@@ -38,6 +43,7 @@ class VPNService:
         self._last_error = ""
         self._active_profile: Optional[Dict[str, Any]] = None
         self._lock = threading.Lock()
+        self._cancel_event = threading.Event()
         self._listeners: List[Callable[[str, Dict[str, Any]], None]] = []
 
         # Check existing state on startup
@@ -146,6 +152,31 @@ class VPNService:
             except Exception:
                 pass
 
+    def _check_cancelled(self):
+        if self._cancel_event.is_set():
+            raise _ConnectionCancelled()
+
+    def cancel_connect(self) -> bool:
+        """
+        Lock-free cancellation for an in-flight connect() attempt.
+        Signals connect() to abort immediately and roll back cleanly.
+        """
+        if self._state == STATE_CONNECTING:
+            self._cancel_event.set()
+            self._state = STATE_DISCONNECTING
+            self._notify("stage_changed", {
+                "stage": "teardown",
+                "stage_index": 0,
+                "stage_total": 5,
+                "stage_label": "Cancelling Connection",
+                "message": "Aborting handshake & restoring network..."
+            })
+            self._notify("state_changed", {"message": "Cancelling connection..."})
+            return True
+        if self._state == STATE_CONNECTED:
+            return self.disconnect()
+        return False
+
     def connect(self, target: Any = None) -> bool:
         """
         Connect to VPN.
@@ -156,6 +187,7 @@ class VPNService:
             if self._state == STATE_CONNECTING:
                 return True
 
+            self._cancel_event.clear()
             try:
                 profile = None
                 if target is None:
@@ -213,31 +245,38 @@ class VPNService:
                 dns_primary = settings.get("dns", "1.1.1.1")
                 dns_backup = settings.get("dns_backup", "8.8.8.8")
                 disable_ipv6_opt = bool(settings.get("disable_ipv6", True))
+                verify_tunnel_opt = bool(settings.get("verify_tunnel", True))
+                verify_timeout = float(settings.get("verify_timeout", 12.0))
+                udp_relay_opt = bool(settings.get("udp_relay", True))
+                stage_total = 5 if verify_tunnel_opt else 4
 
                 # Step 1: Detect physical gateway & interface
+                self._check_cancelled()
                 self._notify("stage_changed", {
                     "stage": "resolving",
                     "stage_index": 1,
-                    "stage_total": 4,
-                    "stage_label": "Resolving VPN Node",
+                    "stage_total": stage_total,
+                    "stage_label": "1/5: Resolving Node" if stage_total == 5 else "1/4: Resolving Node",
                     "message": "Detecting physical network gateway...",
                     "node_id": "server"
                 })
                 gw, dev = self.network_mgr.get_physical_route(tun_name=tun_dev)
+                self._check_cancelled()
 
                 # Step 2: Resolve server domain to IPv4
                 server_host = profile["server"]
                 self._notify("stage_changed", {
                     "stage": "resolving",
                     "stage_index": 1,
-                    "stage_total": 4,
-                    "stage_label": "Resolving VPN Node",
+                    "stage_total": stage_total,
+                    "stage_label": "1/5: Resolving Node" if stage_total == 5 else "1/4: Resolving Node",
                     "message": f"Resolving server {server_host}...",
                     "node_id": "server"
                 })
                 server_ip = self.network_mgr.resolve_server_ip(server_host)
+                self._check_cancelled()
 
-                # Step 3: Write active config for sslocal
+                # Step 3: Write active config for sslocal (with TCP+UDP relay & TCP_NODELAY)
                 config_path = self.config_mgr.export_active_config(profile)
 
                 # Snapshot IPv6 sysctl state before mutating network
@@ -265,75 +304,100 @@ class VPNService:
                     json.dump(session_data, f, indent=2)
 
                 # Step 4: Start sslocal (Stage 2: SOCKS5 Core)
+                self._check_cancelled()
                 self._notify("stage_changed", {
                     "stage": "sslocal",
                     "stage_index": 2,
-                    "stage_total": 4,
-                    "stage_label": "Starting SOCKS5 Core",
-                    "message": f"Starting Shadowsocks core daemon ({socks_host}:{socks_port})...",
+                    "stage_total": stage_total,
+                    "stage_label": f"2/{stage_total}: SOCKS5 Core",
+                    "message": f"Starting Shadowsocks core ({'TCP+UDP' if udp_relay_opt else 'TCP'} on {socks_host}:{socks_port})...",
                     "node_id": "sslocal"
                 })
-                self.process_mgr.start_sslocal(config_path, host=socks_host, port=socks_port)
+                self.process_mgr.start_sslocal(config_path, host=socks_host, port=socks_port, cancel_event=self._cancel_event)
+                self._check_cancelled()
 
-                # Step 5: Setup TUN interface & start tun2socks (Stage 3: TUN & IPv6 Guard)
+                # Step 5: Setup TUN interface & start tun2socks (Stage 3: Virtual L3 tun0)
                 self._notify("stage_changed", {
                     "stage": "tun0",
                     "stage_index": 3,
-                    "stage_total": 4,
-                    "stage_label": "Provisioning Virtual L3 tun0",
-                    "message": f"Creating TUN interface {tun_dev} (10.0.0.2/24)...",
+                    "stage_total": stage_total,
+                    "stage_label": f"3/{stage_total}: Virtual tun0",
+                    "message": f"Provisioning TUN interface {tun_dev} ({tun_ip})...",
                     "node_id": "tun0"
                 })
                 self.network_mgr.setup_tun_interface(tun_name=tun_dev, tun_ip=tun_ip)
+                self._check_cancelled()
 
                 self.process_mgr.start_tun2socks(
                     tun_device=tun_dev,
-                    proxy_url=f"socks5://{socks_host}:{socks_port}"
+                    proxy_url=f"socks5://{socks_host}:{socks_port}",
+                    cancel_event=self._cancel_event,
                 )
+                self._check_cancelled()
 
-                # Step 6: Disable network IPv6 to prevent IPv6 leaks
-                ipv6_disabled_ok = False
-                if disable_ipv6_opt:
-                    self._notify("stage_changed", {
-                        "stage": "tun0",
-                        "stage_index": 3,
-                        "stage_total": 4,
-                        "stage_label": "Arming IPv6 Leak Shield",
-                        "message": "Disabling network IPv6 to prevent IPv6 leaks...",
-                        "node_id": "tun0"
-                    })
-                    session_data["ipv6_disabled"] = True
-                    with open(SESSION_FILE, "w") as f:
-                        json.dump(session_data, f, indent=2)
-                    ipv6_disabled_ok = self.network_mgr.disable_ipv6(
-                        physical_dev=dev,
-                        prev_state=ipv6_prev_state
-                    )
-
-                # Step 7: Apply routing & route pinning (Stage 4: Full-Tunnel Routing)
+                # Step 6: Atomically arm IPv6 shield, apply kernel routes, & configure DNS + flush caches
                 self._notify("stage_changed", {
                     "stage": "routing",
                     "stage_index": 4,
-                    "stage_total": 4,
-                    "stage_label": "Securing Kernel Routes",
-                    "message": "Routing system traffic through VPN...",
+                    "stage_total": stage_total,
+                    "stage_label": f"4/{stage_total}: Routes & DNS",
+                    "message": "Securing kernel routes, IPv6 shield & flushing DNS...",
                     "node_id": "apps"
                 })
-                self.network_mgr.apply_routes(
+                if disable_ipv6_opt:
+                    session_data["ipv6_disabled"] = True
+                    with open(SESSION_FILE, "w") as f:
+                        json.dump(session_data, f, indent=2)
+
+                net_res = self.network_mgr.activate_tunnel_network(
                     server_ip=server_ip,
                     gateway_ip=gw,
                     physical_dev=dev,
-                    tun_name=tun_dev
-                )
-
-                # Step 8: Configure DNS
-                self.network_mgr.configure_dns(
                     tun_name=tun_dev,
                     primary_dns=dns_primary,
-                    backup_dns=dns_backup
+                    backup_dns=dns_backup,
+                    disable_ipv6=disable_ipv6_opt,
+                    ipv6_prev_state=ipv6_prev_state,
                 )
+                if isinstance(net_res, dict):
+                    ipv6_disabled_ok = bool(net_res.get("ipv6_disabled", False))
+                else:
+                    ipv6_disabled_ok = bool(disable_ipv6_opt)
+                self._check_cancelled()
 
-                # Step 9: Start real stats monitor & persist session initial telemetry
+                # Step 7: Verify real end-to-end internet connectivity before flipping to CONNECTED
+                verify_result: Dict[str, Any] = {
+                    "verified": True,
+                    "dns_ok": True,
+                    "aborted": False,
+                    "cancelled": False,
+                    "latency_ms": None,
+                    "detail": "Verification skipped",
+                }
+                if verify_tunnel_opt:
+                    self._notify("stage_changed", {
+                        "stage": "verifying",
+                        "stage_index": 5,
+                        "stage_total": stage_total,
+                        "stage_label": f"5/{stage_total}: Verifying Net",
+                        "message": "Checking real internet & DNS flow through tun0...",
+                        "node_id": "server"
+                    })
+                    raw_verify = self.network_mgr.verify_tunnel_connectivity(
+                        timeout=verify_timeout,
+                        retry_interval=0.45,
+                        check_alive=self.process_mgr.is_running,
+                        cancel_event=self._cancel_event,
+                    )
+                    if isinstance(raw_verify, dict):
+                        verify_result = raw_verify
+                        if verify_result.get("cancelled"):
+                            raise _ConnectionCancelled()
+                        if verify_result.get("aborted"):
+                            raise ProcessError(verify_result.get("detail") or "VPN daemon exited during tunnel verification.")
+                self._check_cancelled()
+
+                # Step 8: Start real stats monitor & persist session initial telemetry
                 self.stats_monitor = StatsMonitor(interface=tun_dev)
                 self.stats_monitor.start(start_time=connect_time)
                 session_data["initial_rx"] = self.stats_monitor.initial_rx
@@ -344,7 +408,8 @@ class VPNService:
                 self._state = STATE_CONNECTED
                 self._notify("connected", {
                     "stage": "connected",
-                    "stage_index": 4,
+                    "stage_index": stage_total,
+                    "stage_total": stage_total,
                     "stage_label": "Live Flow Active",
                     "message": "VPN Connected Successfully",
                     "profile": profile,
@@ -352,9 +417,28 @@ class VPNService:
                     "tun_dev": tun_dev,
                     "gateway_ip": gw,
                     "physical_dev": dev,
-                    "ipv6_disabled": ipv6_disabled_ok
+                    "ipv6_disabled": ipv6_disabled_ok,
+                    "udp_relay": udp_relay_opt,
+                    "verified": bool(verify_result.get("verified", True)),
+                    "verify_dns_ok": bool(verify_result.get("dns_ok", True)),
+                    "verify_latency_ms": verify_result.get("latency_ms"),
+                    "verify_detail": verify_result.get("detail", ""),
                 })
                 return True
+
+            except _ConnectionCancelled:
+                self._rollback_on_error()
+                self._last_error = ""
+                self._state = STATE_DISCONNECTED
+                self._notify("disconnected", {
+                    "stage": "idle",
+                    "stage_index": 0,
+                    "stage_total": 5,
+                    "stage_label": "Direct Physical Route",
+                    "message": "Connection cancelled by user",
+                    "cancelled": True,
+                })
+                return False
 
             except Exception as e:
                 self._last_error = str(e)
@@ -377,7 +461,9 @@ class VPNService:
             pass
 
     def disconnect(self) -> bool:
-        """Disconnect VPN and restore all network routes and DNS."""
+        """Disconnect VPN (or cancel in-flight connect) and restore all network routes and DNS."""
+        if self._state == STATE_CONNECTING:
+            self._cancel_event.set()
         with self._lock:
             if self._state in (STATE_DISCONNECTED, STATE_DISCONNECTING):
                 return True

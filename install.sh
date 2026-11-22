@@ -314,7 +314,9 @@ find_existing_bin() {
   done
   TARGET_USER="${SUDO_USER:-$(logname 2>/dev/null || echo '')}"
   if [[ -n "$TARGET_USER" ]]; then
-    local user_cargo="/home/$TARGET_USER/.cargo/bin/$name"
+    local user_home
+    user_home="$(getent passwd "$TARGET_USER" 2>/dev/null | cut -d: -f6 || echo "/home/$TARGET_USER")"
+    local user_cargo="$user_home/.cargo/bin/$name"
     if [[ -x "$user_cargo" ]]; then
       echo "$user_cargo"
       return 0
@@ -404,6 +406,8 @@ cp -r "$SRC_DIR/core" "$TARGET_DIR/"
 cp -r "$SRC_DIR/gui" "$TARGET_DIR/"
 cp -r "$SRC_DIR/cli" "$TARGET_DIR/"
 cp -r "$SRC_DIR/bin" "$TARGET_DIR/"
+# Strip any copied local __pycache__ bytecode so /opt/auralink compiles cleanly
+find "$TARGET_DIR" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 if [[ -f "$SRC_DIR/uninstall.sh" ]]; then
   cp "$SRC_DIR/uninstall.sh" "$TARGET_DIR/uninstall.sh"
   chmod 0755 "$TARGET_DIR/uninstall.sh"
@@ -531,7 +535,13 @@ for bin in auralink vpn-core-helper sslocal tun2socks ip; do
 done
 
 if [[ ! -c /dev/net/tun ]]; then
+  modprobe tun 2>/dev/null || true
+fi
+if [[ ! -c /dev/net/tun ]]; then
   echo -e "  ${YELLOW}[WARN]${RESET} /dev/net/tun not detected yet (try: sudo modprobe tun)"
+fi
+if [[ -x "$HELPER_LINK" ]] && grep -q "net-activate)" "$HELPER_LINK" 2>/dev/null; then
+  echo -e "  ${GREEN}[OK]${RESET} vpn-core-helper (batched net-activate + DNS cache flush + IPv6 shield)"
 fi
 
 echo ""

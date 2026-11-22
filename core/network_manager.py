@@ -9,10 +9,13 @@ IPv6 leak protection, and atomic network teardown.
 import os
 import sys
 import re
+import time
 import socket
 import subprocess
 import shutil
-from typing import Any, Dict, List, Optional, Tuple
+import threading
+import urllib.request
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 
 IPV6_CONF_DIR = "/proc/sys/net/ipv6/conf"
@@ -150,8 +153,13 @@ class NetworkManager:
         return res.returncode == 0
 
     def setup_tun_interface(self, tun_name: str = "tun0", tun_ip: str = "10.0.0.2/24"):
-        """Creates and configures TUN interface."""
+        """Creates and configures TUN interface (prefers single helper call)."""
         if not self.is_tun_active(tun_name):
+            helper = self._select_helper("tun-up")
+            if helper:
+                res = self.run_cmd([helper, "tun-up", tun_name, tun_ip], check=False)
+                if res.returncode == 0 and self.is_tun_active(tun_name):
+                    return
             self.run_cmd(["ip", "tuntap", "add", "mode", "tun", "dev", tun_name])
             self.run_cmd(["ip", "addr", "add", tun_ip, "dev", tun_name])
             self.run_cmd(["ip", "link", "set", tun_name, "up"])
@@ -160,12 +168,254 @@ class NetworkManager:
         """
         Pins server IP to physical gateway, then directs default route to tun.
         """
-        # 1. Route server traffic via physical dev/gateway
+        helper = self._select_helper("routes-up")
+        if helper:
+            res = self.run_cmd([helper, "routes-up", server_ip, gateway_ip, physical_dev, tun_name], check=False)
+            if res.returncode == 0:
+                return
+        # Fallback: direct ip commands
         self.run_cmd(["ip", "route", "replace", f"{server_ip}/32", "via", gateway_ip, "dev", physical_dev])
-        # 2. Set default route to TUN interface
         self.run_cmd(["ip", "route", "replace", "default", "dev", tun_name])
-        # 3. Drop default IPv6 route to prevent leaks
         self.run_cmd(["ip", "-6", "route", "del", "default"], check=False)
+
+    def activate_tunnel_network(
+        self,
+        server_ip: str,
+        gateway_ip: str,
+        physical_dev: str,
+        tun_name: str = "tun0",
+        primary_dns: str = "1.1.1.1",
+        backup_dns: str = "8.8.8.8",
+        disable_ipv6: bool = True,
+        ipv6_prev_state: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, bool]:
+        """
+        Atomically disables IPv6 (if requested), applies server + default TUN routes,
+        and configures DNS with cache flush in a single privileged helper invocation.
+        Falls back to individual methods if an older helper is installed.
+        """
+        lo_val = 0
+        if disable_ipv6:
+            if ipv6_prev_state and isinstance(ipv6_prev_state.get("interfaces"), dict):
+                lo_val = 1 if ipv6_prev_state["interfaces"].get("lo", 0) else 0
+            else:
+                cur_lo = self._read_ipv6_sysctl("lo")
+                if cur_lo is not None:
+                    lo_val = cur_lo
+
+        helper = self._select_helper("net-activate")
+        if helper:
+            p_dns = (primary_dns or "1.1.1.1").strip()
+            b_dns = (backup_dns or "").strip() or "-"
+            args = [
+                helper,
+                "net-activate",
+                server_ip,
+                gateway_ip,
+                physical_dev,
+                tun_name,
+                p_dns,
+                b_dns,
+                "1" if disable_ipv6 else "0",
+                str(lo_val),
+            ]
+            res = self.run_cmd(args, check=False)
+            if res.returncode == 0:
+                ipv6_ok = self.is_ipv6_disabled(physical_dev=physical_dev) if disable_ipv6 else False
+                return {
+                    "batched": True,
+                    "ipv6_disabled": ipv6_ok,
+                    "routes_applied": True,
+                    "dns_configured": True,
+                }
+
+        # Fallback to individual calls
+        ipv6_ok = False
+        if disable_ipv6:
+            ipv6_ok = self.disable_ipv6(physical_dev=physical_dev, prev_state=ipv6_prev_state)
+        self.apply_routes(
+            server_ip=server_ip,
+            gateway_ip=gateway_ip,
+            physical_dev=physical_dev,
+            tun_name=tun_name,
+        )
+        dns_ok = self.configure_dns(
+            tun_name=tun_name,
+            primary_dns=primary_dns,
+            backup_dns=backup_dns,
+        )
+        return {
+            "batched": False,
+            "ipv6_disabled": ipv6_ok,
+            "routes_applied": True,
+            "dns_configured": dns_ok,
+        }
+
+    def verify_tunnel_connectivity(
+        self,
+        timeout: float = 12.0,
+        retry_interval: float = 0.45,
+        check_alive: Optional[Callable[[], bool]] = None,
+        cancel_event: Optional[threading.Event] = None,
+    ) -> Dict[str, Any]:
+        """
+        Verifies real end-to-end internet & DNS flow through the active TUN route.
+        Retries rapidly until either HTTP/DNS succeeds, cancel_event fires, or timeout expires.
+        Bypasses environment HTTP_PROXY variables so traffic genuinely traverses tun0.
+        """
+        start = time.monotonic()
+        deadline = start + max(1.0, float(timeout))
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+        http_probes = [
+            "http://cp.cloudflare.com/generate_204",
+            "http://connectivitycheck.gstatic.com/generate_204",
+        ]
+        ip_tcp_probes = [
+            ("1.1.1.1", 443),
+            ("8.8.8.8", 443),
+        ]
+
+        attempt = 0
+        last_err = ""
+        ip_only_ok = False
+        ip_latency_ms: Optional[int] = None
+
+        while time.monotonic() < deadline:
+            if cancel_event and cancel_event.is_set():
+                return {
+                    "verified": False,
+                    "dns_ok": False,
+                    "aborted": False,
+                    "cancelled": True,
+                    "latency_ms": None,
+                    "endpoint": "",
+                    "elapsed_sec": round(time.monotonic() - start, 2),
+                    "detail": "Connection cancelled by user",
+                }
+            if check_alive and not check_alive():
+                return {
+                    "verified": False,
+                    "dns_ok": False,
+                    "aborted": True,
+                    "cancelled": False,
+                    "latency_ms": None,
+                    "endpoint": "",
+                    "elapsed_sec": round(time.monotonic() - start, 2),
+                    "detail": "Tunnel daemon stopped during verification",
+                }
+
+            url = http_probes[attempt % len(http_probes)]
+            remaining = deadline - time.monotonic()
+            per_req_timeout = min(2.0, max(0.8, remaining))
+
+            t0 = time.monotonic()
+            try:
+                req = urllib.request.Request(
+                    url,
+                    method="GET",
+                    headers={"User-Agent": "AuraLink-Probe/1.0", "Connection": "close"},
+                )
+                with opener.open(req, timeout=per_req_timeout) as resp:
+                    if cancel_event and cancel_event.is_set():
+                        return {
+                            "verified": False,
+                            "dns_ok": False,
+                            "aborted": False,
+                            "cancelled": True,
+                            "latency_ms": None,
+                            "endpoint": "",
+                            "elapsed_sec": round(time.monotonic() - start, 2),
+                            "detail": "Connection cancelled by user",
+                        }
+                    status = getattr(resp, "status", 200)
+                    if 200 <= status < 400:
+                        lat_ms = int((time.monotonic() - t0) * 1000)
+                        return {
+                            "verified": True,
+                            "dns_ok": True,
+                            "aborted": False,
+                            "cancelled": False,
+                            "latency_ms": lat_ms,
+                            "endpoint": url,
+                            "elapsed_sec": round(time.monotonic() - start, 2),
+                            "detail": f"Internet & DNS verified ({lat_ms}ms)",
+                        }
+            except Exception as e:
+                last_err = str(e)
+
+            if cancel_event and cancel_event.is_set():
+                return {
+                    "verified": False,
+                    "dns_ok": False,
+                    "aborted": False,
+                    "cancelled": True,
+                    "latency_ms": None,
+                    "endpoint": "",
+                    "elapsed_sec": round(time.monotonic() - start, 2),
+                    "detail": "Connection cancelled by user",
+                }
+
+            # After 2 failed hostname attempts (~4s), also test raw IP TCP connectivity
+            # so we know if the tunnel forwards packets even when DNS is slow/restricted.
+            if attempt >= 1 and not ip_only_ok and time.monotonic() < deadline:
+                host, port = ip_tcp_probes[attempt % len(ip_tcp_probes)]
+                t_ip = time.monotonic()
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.settimeout(min(1.5, max(0.5, deadline - time.monotonic())))
+                try:
+                    s.connect((host, port))
+                    ip_only_ok = True
+                    ip_latency_ms = int((time.monotonic() - t_ip) * 1000)
+                except Exception:
+                    pass
+                finally:
+                    try:
+                        s.close()
+                    except Exception:
+                        pass
+
+            attempt += 1
+            sleep_for = min(retry_interval, max(0.0, deadline - time.monotonic()))
+            if sleep_for > 0:
+                if cancel_event:
+                    if cancel_event.wait(sleep_for):
+                        return {
+                            "verified": False,
+                            "dns_ok": False,
+                            "aborted": False,
+                            "cancelled": True,
+                            "latency_ms": None,
+                            "endpoint": "",
+                            "elapsed_sec": round(time.monotonic() - start, 2),
+                            "detail": "Connection cancelled by user",
+                        }
+                else:
+                    time.sleep(sleep_for)
+
+        elapsed = round(time.monotonic() - start, 2)
+        if ip_only_ok:
+            return {
+                "verified": True,
+                "dns_ok": False,
+                "aborted": False,
+                "cancelled": False,
+                "latency_ms": ip_latency_ms,
+                "endpoint": "1.1.1.1:443",
+                "elapsed_sec": elapsed,
+                "detail": f"Tunnel TCP verified ({ip_latency_ms}ms), DNS warming up",
+            }
+
+        return {
+            "verified": False,
+            "dns_ok": False,
+            "aborted": False,
+            "cancelled": False,
+            "latency_ms": None,
+            "endpoint": "",
+            "elapsed_sec": elapsed,
+            "detail": f"Probe timed out after {elapsed}s ({last_err[:80]})" if last_err else f"Probe timed out after {elapsed}s",
+        }
 
     def _select_helper(self, required_action: Optional[str] = None) -> Optional[str]:
         """Selects vpn-core-helper, preferring /usr/local/bin/vpn-core-helper for sudoers match."""
@@ -373,6 +623,8 @@ class NetworkManager:
                 if res.returncode == 0:
                     self.run_cmd(["resolvectl", "domain", tun_name, "~."], check=False)
                     self.run_cmd(["resolvectl", "default-route", tun_name, "yes"], check=False)
+                    self.run_cmd(["resolvectl", "dnsovertls", tun_name, "opportunistic"], check=False)
+                    self.run_cmd(["resolvectl", "flush-caches"], check=False)
                     return True
             except Exception:
                 pass
@@ -382,6 +634,7 @@ class NetworkManager:
             try:
                 res = self.run_cmd(["systemd-resolve", "-i", tun_name, f"--set-dns={p_dns}", "--set-domain=~."], check=False)
                 if res.returncode == 0:
+                    self.run_cmd(["systemd-resolve", "--flush-caches"], check=False)
                     return True
             except Exception:
                 pass

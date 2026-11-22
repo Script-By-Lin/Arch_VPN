@@ -127,13 +127,31 @@ class TestVPNServiceStages(unittest.TestCase):
         mock_net.resolve_server_ip.return_value = "1.2.3.4"
         mock_net.get_ipv6_state.return_value = {"all": 0, "default": 0, "interfaces": {}}
         mock_net.disable_ipv6.return_value = True
+        mock_net.activate_tunnel_network.return_value = {
+            "batched": True,
+            "ipv6_disabled": True,
+            "routes_applied": True,
+            "dns_configured": True,
+        }
+        mock_net.verify_tunnel_connectivity.return_value = {
+            "verified": True,
+            "dns_ok": True,
+            "aborted": False,
+            "latency_ms": 142,
+            "endpoint": "http://cp.cloudflare.com/generate_204",
+            "elapsed_sec": 0.15,
+            "detail": "Internet & DNS verified (142ms)",
+        }
 
         service = VPNService()
         emitted_stages = []
+        connected_payload = {}
 
         def on_event(event_type, data):
             if event_type == "stage_changed":
                 emitted_stages.append(data.get("stage"))
+            elif event_type == "connected":
+                connected_payload.update(data)
 
         service.add_listener(on_event)
 
@@ -144,11 +162,14 @@ class TestVPNServiceStages(unittest.TestCase):
         self.assertEqual(service.state, STATE_CONNECTED)
 
         # Verify stages were sequenced correctly:
-        # resolving -> sslocal -> tun0 -> routing
+        # resolving -> sslocal -> tun0 -> routing -> verifying
         self.assertIn("resolving", emitted_stages)
         self.assertIn("sslocal", emitted_stages)
         self.assertIn("tun0", emitted_stages)
         self.assertIn("routing", emitted_stages)
+        self.assertIn("verifying", emitted_stages)
+        self.assertTrue(connected_payload.get("verified"))
+        self.assertEqual(connected_payload.get("verify_latency_ms"), 142)
 
         # Verify session file was written with start timestamp and initial bytes
         self.assertTrue(os.path.exists(self.session_file))
@@ -157,6 +178,160 @@ class TestVPNServiceStages(unittest.TestCase):
         self.assertIn("connected_at", saved)
         self.assertIn("initial_rx", saved)
         self.assertIn("initial_tx", saved)
+
+    def test_config_export_enables_udp_and_nodelay(self):
+        from core import config_manager
+        with tempfile.TemporaryDirectory() as tmp:
+            orig_dir = config_manager.CONFIG_DIR
+            orig_prof = config_manager.PROFILES_FILE
+            orig_act = config_manager.ACTIVE_CONFIG_FILE
+            orig_set = config_manager.SETTINGS_FILE
+            try:
+                config_manager.CONFIG_DIR = tmp
+                config_manager.PROFILES_FILE = os.path.join(tmp, "profiles.json")
+                config_manager.ACTIVE_CONFIG_FILE = os.path.join(tmp, "active_config.json")
+                config_manager.SETTINGS_FILE = os.path.join(tmp, "settings.json")
+
+                cm = config_manager.ConfigManager()
+                prof = {
+                    "id": "p1",
+                    "name": "FastNode",
+                    "config": {
+                        "server": "1.2.3.4",
+                        "server_port": 443,
+                        "password": "pw",
+                        "method": "chacha20-ietf-poly1305",
+                    },
+                }
+                out_path = cm.export_active_config(prof)
+                with open(out_path, "r") as f:
+                    exported = json.load(f)
+                self.assertEqual(exported.get("mode"), "tcp_and_udp")
+                self.assertTrue(exported.get("no_delay"))
+            finally:
+                config_manager.CONFIG_DIR = orig_dir
+                config_manager.PROFILES_FILE = orig_prof
+                config_manager.ACTIVE_CONFIG_FILE = orig_act
+                config_manager.SETTINGS_FILE = orig_set
+
+    def test_verify_tunnel_connectivity_and_batched_activate(self):
+        from core.network_manager import NetworkManager
+
+        nm = NetworkManager()
+        # 1. Batched net-activate calls vpn-core-helper once
+        with patch.object(nm, "_select_helper", return_value="/usr/local/bin/vpn-core-helper"), \
+             patch.object(nm, "run_cmd", return_value=MagicMock(returncode=0)) as mock_run, \
+             patch.object(nm, "is_ipv6_disabled", return_value=True):
+            res = nm.activate_tunnel_network(
+                server_ip="1.2.3.4",
+                gateway_ip="192.168.1.1",
+                physical_dev="wlan0",
+                tun_name="tun0",
+                primary_dns="1.1.1.1",
+                backup_dns="8.8.8.8",
+                disable_ipv6=True,
+                ipv6_prev_state={"interfaces": {"lo": 0}},
+            )
+            self.assertTrue(res["batched"])
+            self.assertTrue(res["ipv6_disabled"])
+            self.assertEqual(mock_run.call_count, 1)
+            self.assertEqual(mock_run.call_args[0][0][1], "net-activate")
+
+        # 2. verify_tunnel_connectivity returns verified=True on HTTP 204
+        mock_resp = MagicMock()
+        mock_resp.status = 204
+        mock_resp.__enter__.return_value = mock_resp
+        mock_opener = MagicMock()
+        mock_opener.open.return_value = mock_resp
+        with patch("core.network_manager.urllib.request.build_opener", return_value=mock_opener):
+            vres = nm.verify_tunnel_connectivity(timeout=3.0, check_alive=lambda: True)
+            self.assertTrue(vres["verified"])
+            self.assertTrue(vres["dns_ok"])
+            self.assertFalse(vres["aborted"])
+            self.assertIsNotNone(vres["latency_ms"])
+
+        # 3. verify_tunnel_connectivity aborts immediately if daemon dies
+        vres_dead = nm.verify_tunnel_connectivity(timeout=3.0, check_alive=lambda: False)
+        self.assertFalse(vres_dead["verified"])
+        self.assertTrue(vres_dead["aborted"])
+
+        # 4. verify_tunnel_connectivity cancels immediately when cancel_event is set
+        import threading
+        ev = threading.Event()
+        ev.set()
+        vres_cancel = nm.verify_tunnel_connectivity(timeout=5.0, check_alive=lambda: True, cancel_event=ev)
+        self.assertFalse(vres_cancel["verified"])
+        self.assertTrue(vres_cancel["cancelled"])
+        self.assertFalse(vres_cancel["aborted"])
+
+    @patch("core.vpn_service.ConfigManager")
+    @patch("core.vpn_service.ProcessManager")
+    @patch("core.vpn_service.NetworkManager")
+    def test_cancel_while_connecting_rolls_back_cleanly(self, mock_net_cls, mock_proc_cls, mock_cfg_cls):
+        import threading
+        mock_cfg = mock_cfg_cls.return_value
+        mock_proc = mock_proc_cls.return_value
+        mock_net = mock_net_cls.return_value
+
+        mock_cfg.get_settings.return_value = {
+            "tun_device": "tun0",
+            "tun_ip": "10.0.0.2/24",
+            "socks_host": "127.0.0.1",
+            "socks_port": 1080,
+            "dns": "1.1.1.1",
+            "dns_backup": "8.8.8.8",
+            "disable_ipv6": True,
+            "verify_tunnel": True,
+            "verify_timeout": 10.0,
+        }
+        mock_cfg.get_profiles.return_value = [{
+            "id": "p1",
+            "name": "SlowNode",
+            "server": "1.2.3.4",
+            "server_port": 8388,
+            "method": "chacha20-ietf-poly1305",
+            "password": "secret",
+        }]
+        mock_cfg.get_profile_by_id.return_value = mock_cfg.get_profiles.return_value[0]
+        mock_net.get_physical_route.return_value = ("192.168.1.1", "wlan0")
+        mock_net.resolve_server_ip.return_value = "1.2.3.4"
+        mock_net.get_ipv6_state.return_value = {"all": 0, "default": 0, "interfaces": {}}
+        mock_net.activate_tunnel_network.return_value = {"batched": True, "ipv6_disabled": True}
+
+        in_verify = threading.Event()
+
+        def fake_verify(timeout=12.0, retry_interval=0.45, check_alive=None, cancel_event=None):
+            in_verify.set()
+            if cancel_event:
+                cancel_event.wait(5.0)
+                if cancel_event.is_set():
+                    return {"verified": False, "dns_ok": False, "aborted": False, "cancelled": True, "detail": "Cancelled"}
+            return {"verified": True, "dns_ok": True, "aborted": False, "cancelled": False}
+
+        mock_net.verify_tunnel_connectivity.side_effect = fake_verify
+
+        service = VPNService()
+        events = []
+        service.add_listener(lambda ev_type, data: events.append((ev_type, dict(data))))
+
+        result_holder = []
+        t = threading.Thread(target=lambda: result_holder.append(service.connect("p1")))
+        t.start()
+
+        # Wait until connect enters Stage 5/5 verify, then cancel without waiting on lock
+        self.assertTrue(in_verify.wait(3.0))
+        cancelled = service.cancel_connect()
+        self.assertTrue(cancelled)
+
+        t.join(timeout=3.0)
+        self.assertFalse(t.is_alive())
+        self.assertEqual(result_holder, [False])
+        self.assertEqual(service.state, STATE_DISCONNECTED)
+        self.assertEqual(service.last_error, "")
+        self.assertTrue(mock_net.teardown_network.called)
+        self.assertTrue(mock_proc.stop_all.called)
+        disconnected_events = [d for ev, d in events if ev == "disconnected"]
+        self.assertTrue(any(d.get("cancelled") for d in disconnected_events))
 
 
 class TestGUIWidgets(unittest.TestCase):
@@ -199,8 +374,8 @@ class TestGUIWidgets(unittest.TestCase):
             self.assertTrue(len(txt) > 0)
             self.assertNotIn("100% Full-Tunnel", txt)  # Should not claim tunnel is captured when idle
 
-        # 2. Test Connecting stages (1 to 4)
-        for stage in ("resolving", "sslocal", "tun0", "routing"):
+        # 2. Test Connecting stages (1 to 5 including verifying)
+        for stage in ("resolving", "sslocal", "tun0", "routing", "verifying"):
             widget.set_model_state(STATE_CONNECTING)
             widget.set_connection_stage({
                 "stage": stage,
@@ -478,6 +653,12 @@ class TestGUIWidgets(unittest.TestCase):
         self.assertLessEqual(win.tunnel_model.width(), 510)
         # Verify tunnel model and speed tiles are docked at the bottom
         self.assertGreater(win.tunnel_model.geometry().y(), win.btn_circular.geometry().y())
+
+        # Verify clicking connect button while STATE_CONNECTING calls cancel_connect()
+        mock_svc.state = STATE_CONNECTING
+        mock_svc.cancel_connect.reset_mock()
+        win.on_connect_toggle()
+        mock_svc.cancel_connect.assert_called_once()
 
 
 if __name__ == "__main__":

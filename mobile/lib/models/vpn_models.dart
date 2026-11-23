@@ -114,6 +114,7 @@ class VpnProfile {
     'plugin_opts',
     'mode',
     'timeout',
+    'keep_alive',
     'fast_open',
     'no_delay',
     'prefix',
@@ -142,6 +143,8 @@ class VpnProfile {
       'local_address': localAddress,
       'local_port': localPort,
       'no_delay': extraConfig['no_delay'] ?? true,
+      'keep_alive': extraConfig['keep_alive'] ?? 15,
+      'timeout': extraConfig['timeout'] ?? 300,
     });
     if (prefix != null && prefix!.isNotEmpty) {
       map['prefix'] = prefix;

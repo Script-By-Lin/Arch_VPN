@@ -39,8 +39,10 @@ void main() {
     await tester.tap(find.text('Settings'));
     await tester.pump(const Duration(milliseconds: 200));
     expect(find.text('Tunnel & Network Settings'), findsOneWidget);
+    expect(find.text('DNS UPSTREAM RESOLVER'), findsOneWidget);
     expect(find.text('IPv6 Leak Shield'), findsOneWidget);
-    expect(find.text('MOBILE FREE KEYS ADMIN BACKEND'), findsOneWidget);
+    expect(find.text('VPN ENGINE BACKEND'), findsNothing);
+    expect(find.text('MOBILE FREE KEYS ADMIN BACKEND'), findsNothing);
 
     await tester.binding.setSurfaceSize(null);
   });

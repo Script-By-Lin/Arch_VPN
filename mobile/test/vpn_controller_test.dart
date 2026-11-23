@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:auralink_vpn/models/free_key_region.dart';
 import 'package:auralink_vpn/models/vpn_models.dart';
 import 'package:auralink_vpn/services/free_keys_service.dart';
@@ -107,4 +109,62 @@ void main() {
     expect(ctrl.state, VpnConnectionState.disconnected);
     expect(ctrl.ipv6ShieldActive, isFalse);
   });
+
+  test('pingFreeRegionKey measures real TCP latency and preserves it on refresh', () async {
+    final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+    final sub = server.listen((s) => s.destroy());
+    try {
+      final liveService = _LivePingFreeKeysService(server.port);
+      final ctrl = VpnController(
+        storage: _MemoryStorage(),
+        platform: _StubPlatform(),
+        freeKeysService: liveService,
+      );
+      await ctrl.initialize();
+      await ctrl.fetchFreeRegionKeys();
+
+      final ms = await ctrl.pingFreeRegionKey('de1');
+      expect(ms, isNotNull);
+      expect(ms!, greaterThanOrEqualTo(1));
+      expect(ctrl.freeRegionKeys.first.lastPingMs, ms);
+      expect(ctrl.isFreeKeyPinging('de1'), isFalse);
+
+      // Refresh preserves measured ping
+      await ctrl.fetchFreeRegionKeys();
+      expect(ctrl.freeRegionKeys.first.lastPingMs, ms);
+    } finally {
+      await sub.cancel();
+      await server.close();
+    }
+  });
+}
+
+class _LivePingFreeKeysService extends FreeKeysService {
+  final int port;
+  _LivePingFreeKeysService(this.port);
+
+  @override
+  Future<List<FreeRegionKey>> loadCached() async => const [];
+
+  @override
+  Future<List<FreeRegionKey>> fetchPublishedFreeKeys(
+    String backendBaseUrl, {
+    dynamic client,
+  }) async =>
+      [
+        FreeRegionKey(
+          id: 'de1',
+          region: 'Germany',
+          countryCode: 'DE',
+          flag: '🇩🇪',
+          city: 'Frankfurt',
+          label: 'Germany Local Test',
+          rawKey: 'ss://uuid@127.0.0.1:$port?encryption=none#DE',
+          sourceType: 'ss',
+          server: '127.0.0.1',
+          serverPort: port,
+          method: 'none',
+          password: 'uuid',
+        ),
+      ];
 }

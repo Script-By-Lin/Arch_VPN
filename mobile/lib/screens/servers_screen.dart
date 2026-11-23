@@ -182,6 +182,7 @@ class _ServersScreenState extends State<ServersScreen> {
                               selected: selected,
                               isConnected: selected &&
                                   ctrl.state == VpnConnectionState.connected,
+                              isPinging: ctrl.isProfilePinging(prof.id),
                               onSelect: () => ctrl.selectProfile(prof.id),
                               onPing: () => ctrl.pingProfile(prof.id),
                               onDelete: () => _confirmDelete(context, ctrl, prof),
@@ -237,6 +238,7 @@ class _ProfileCard extends StatelessWidget {
   final VpnProfile profile;
   final bool selected;
   final bool isConnected;
+  final bool isPinging;
   final VoidCallback onSelect;
   final VoidCallback onPing;
   final VoidCallback onDelete;
@@ -245,6 +247,7 @@ class _ProfileCard extends StatelessWidget {
     required this.profile,
     required this.selected,
     required this.isConnected,
+    this.isPinging = false,
     required this.onSelect,
     required this.onPing,
     required this.onDelete,
@@ -328,7 +331,7 @@ class _ProfileCard extends StatelessWidget {
             ),
             const SizedBox(width: 6),
             InkWell(
-              onTap: onPing,
+              onTap: isPinging ? null : onPing,
               borderRadius: BorderRadius.circular(8),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -337,15 +340,24 @@ class _ProfileCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: DaylightColors.border),
                 ),
-                child: Text(
-                  pingText,
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w700,
-                    fontFamily: 'monospace',
-                    color: pingColor,
-                  ),
-                ),
+                child: isPinging
+                    ? const SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 1.8,
+                          color: DaylightColors.primary,
+                        ),
+                      )
+                    : Text(
+                        pingText,
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          fontFamily: 'monospace',
+                          color: pingColor,
+                        ),
+                      ),
               ),
             ),
             IconButton(

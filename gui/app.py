@@ -174,6 +174,11 @@ def clean_and_format_log(raw: str) -> tuple:
     s = re.sub(r"^through server\s*", "via ", s)
     s = s.strip()
 
+    # Downgrade benign client-cancelled local SOCKS5 preconnect EOFs from alarming ERROR to DEBUG
+    if source == "sslocal" and level == "ERROR" and "socks5 tcp client handler error: unexpected end of file" in s.lower():
+        level = "DEBUG"
+        s = "Local client closed SOCKS5 handshake early (harmless)"
+
     # If message has its own [TAG], use it if source was generic system
     if source == "system":
         tag_m = re.match(r"^\[([A-Za-z0-9_-]+)\]\s*", s)

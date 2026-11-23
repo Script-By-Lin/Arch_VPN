@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
@@ -33,6 +34,8 @@ class VpnController extends ChangeNotifier {
 
   List<VpnProfile> _profiles = [];
   List<FreeRegionKey> _freeRegionKeys = [];
+  final Set<String> _pingingFreeKeyIds = {};
+  final Set<String> _pingingProfileIds = {};
   bool _loadingFreeKeys = false;
   String? _freeKeysError;
   VpnSettings _settings = const VpnSettings();
@@ -61,6 +64,8 @@ class VpnController extends ChangeNotifier {
   // Getters
   List<VpnProfile> get profiles => List.unmodifiable(_profiles);
   List<FreeRegionKey> get freeRegionKeys => List.unmodifiable(_freeRegionKeys);
+  bool isFreeKeyPinging(String keyId) => _pingingFreeKeyIds.contains(keyId);
+  bool isProfilePinging(String profileId) => _pingingProfileIds.contains(profileId);
   bool get loadingFreeKeys => _loadingFreeKeys;
   String? get freeKeysError => _freeKeysError;
   VpnSettings get settings => _settings;
@@ -140,10 +145,16 @@ class VpnController extends ChangeNotifier {
     notifyListeners();
 
     try {
+      final prevPings = {
+        for (final k in _freeRegionKeys)
+          if (k.lastPingMs != null) k.id: k.lastPingMs!,
+      };
       final fetched = await _freeKeysService.fetchPublishedFreeKeys(
         _settings.freeKeysBackendUrl,
       );
-      _freeRegionKeys = fetched;
+      _freeRegionKeys = fetched
+          .map((k) => prevPings.containsKey(k.id) ? k.copyWith(lastPingMs: prevPings[k.id]) : k)
+          .toList();
       _freeKeysError = null;
       addLog(
         'free-keys',
@@ -161,36 +172,183 @@ class VpnController extends ChangeNotifier {
     }
   }
 
+  /// Resolves an IPv4 address first (avoiding Android IPv6 blackhole timeouts),
+  /// measures pure TCP handshake RTT, retries once on transient radio wake-up drop,
+  /// and optionally falls back to local SOCKS5 when VPN is active.
+  Future<(int?, String?)> _measureTcpLatency(
+    String rawHost,
+    int port, {
+    Duration timeout = const Duration(seconds: 6),
+  }) async {
+    var host = rawHost.trim();
+    if (host.startsWith('[') && host.endsWith(']')) {
+      host = host.substring(1, host.length - 1);
+    }
+    if (host.isEmpty || port <= 0 || port > 65535) {
+      return (null, 'Invalid target $rawHost:$port');
+    }
+
+    // 1. Resolve address (prefer IPv4 to prevent IPv6 blackhole timeouts on mobile)
+    InternetAddress? targetAddr = InternetAddress.tryParse(host);
+    if (targetAddr == null) {
+      try {
+        final v4 = await InternetAddress.lookup(host, type: InternetAddressType.IPv4)
+            .timeout(const Duration(seconds: 4));
+        if (v4.isNotEmpty) targetAddr = v4.first;
+      } catch (_) {}
+      if (targetAddr == null) {
+        try {
+          final any = await InternetAddress.lookup(host)
+              .timeout(const Duration(seconds: 4));
+          if (any.isNotEmpty) targetAddr = any.first;
+        } catch (e) {
+          return (null, 'DNS lookup failed: $e');
+        }
+      }
+    }
+
+    if (targetAddr == null) {
+      return (null, 'Unable to resolve $host');
+    }
+
+    // 2. Direct TCP handshake with 1 quick retry for mobile radio wake-up
+    String? lastErr;
+    for (int attempt = 0; attempt < 2; attempt++) {
+      final attemptTimeout = attempt == 0 ? timeout : const Duration(seconds: 4);
+      final sw = Stopwatch()..start();
+      Socket? sock;
+      try {
+        sock = await Socket.connect(targetAddr, port, timeout: attemptTimeout);
+        sw.stop();
+        sock.destroy();
+        return (sw.elapsedMilliseconds.clamp(1, 99999), null);
+      } catch (e) {
+        sw.stop();
+        try {
+          sock?.destroy();
+        } catch (_) {}
+        lastErr = e.toString();
+      }
+    }
+
+    // 3. If VPN is already connected via native sslocal, test via local SOCKS5 as fallback
+    if (_state == VpnConnectionState.connected && !isUsingDemoEngine) {
+      final socksMs = await _measureViaLocalSocks5(host, port);
+      if (socksMs != null) {
+        return (socksMs, null);
+      }
+    }
+
+    return (null, lastErr ?? 'Connection timed out');
+  }
+
+  Future<int?> _measureViaLocalSocks5(String host, int port) async {
+    Socket? sock;
+    try {
+      sock = await Socket.connect(
+        InternetAddress.loopbackIPv4,
+        1080,
+        timeout: const Duration(seconds: 2),
+      );
+      final iter = StreamIterator<List<int>>(sock);
+      Future<List<int>> readAtLeast(int count, Duration limit) async {
+        final buf = <int>[];
+        final deadline = DateTime.now().add(limit);
+        while (buf.length < count) {
+          final rem = deadline.difference(DateTime.now());
+          if (rem.isNegative) throw TimeoutException('SOCKS5 read timeout');
+          final hasNext = await iter.moveNext().timeout(rem);
+          if (!hasNext) throw const SocketException('SOCKS5 closed');
+          buf.addAll(iter.current);
+        }
+        return buf;
+      }
+
+      // Greeting: VER=5, NMETHODS=1, NO_AUTH=0
+      sock.add(const [0x05, 0x01, 0x00]);
+      await sock.flush();
+      final greet = await readAtLeast(2, const Duration(seconds: 2));
+      if (greet[0] != 0x05 || greet[1] != 0x00) return null;
+
+      // CONNECT request with domain ATYP=0x03
+      final hostBytes = utf8.encode(host);
+      if (hostBytes.length > 255) return null;
+      final req = <int>[
+        0x05,
+        0x01,
+        0x00,
+        0x03,
+        hostBytes.length,
+        ...hostBytes,
+        (port >> 8) & 0xFF,
+        port & 0xFF,
+      ];
+      final sw = Stopwatch()..start();
+      sock.add(req);
+      await sock.flush();
+      final rep = await readAtLeast(4, const Duration(seconds: 5));
+      sw.stop();
+      if (rep[0] == 0x05 && rep[1] == 0x00) {
+        return sw.elapsedMilliseconds.clamp(1, 99999);
+      }
+      return null;
+    } catch (_) {
+      return null;
+    } finally {
+      try {
+        sock?.destroy();
+      } catch (_) {}
+    }
+  }
+
   Future<int?> pingFreeRegionKey(String keyId) async {
     final idx = _freeRegionKeys.indexWhere((k) => k.id == keyId);
     if (idx == -1) return null;
     final item = _freeRegionKeys[idx];
 
-    final sw = Stopwatch()..start();
+    _pingingFreeKeyIds.add(keyId);
+    notifyListeners();
+
+    String targetHost = item.server;
+    int targetPort = item.serverPort;
+
     try {
-      final sock = await Socket.connect(
-        item.server,
-        item.serverPort,
-        timeout: const Duration(seconds: 3),
-      );
-      sw.stop();
-      sock.destroy();
-      final ms = sw.elapsedMilliseconds;
-      _freeRegionKeys[idx] = item.copyWith(lastPingMs: ms);
-      notifyListeners();
+      // Resolve remote ssconf:// or subscription URL to its actual VPN node host:port
+      if ((item.sourceType == 'ssconf' || item.sourceType == 'url') &&
+          item.rawKey.isNotEmpty) {
+        try {
+          final resolved = await VpnKeyParser.parse(item.rawKey);
+          targetHost = resolved.server;
+          targetPort = resolved.serverPort;
+        } catch (_) {}
+      }
+
+      final (ms, err) = await _measureTcpLatency(targetHost, targetPort);
+      final curIdx = _freeRegionKeys.indexWhere((k) => k.id == keyId);
+      if (curIdx != -1) {
+        _freeRegionKeys[curIdx] = _freeRegionKeys[curIdx].copyWith(
+          lastPingMs: ms ?? -1,
+        );
+      }
+      if (ms != null) {
+        addLog('ping', LogLevel.info, '${item.flag} ${item.label} responded in ${ms}ms');
+      } else {
+        addLog(
+          'ping',
+          LogLevel.warn,
+          'Ping timeout for ${item.flag} ${item.label} ($targetHost:$targetPort): $err',
+        );
+      }
       return ms;
-    } catch (_) {
-      sw.stop();
-      _freeRegionKeys[idx] = item.copyWith(lastPingMs: -1);
+    } finally {
+      _pingingFreeKeyIds.remove(keyId);
       notifyListeners();
-      return null;
     }
   }
 
   Future<void> pingAllFreeRegionKeys() async {
-    for (final item in List<FreeRegionKey>.from(_freeRegionKeys)) {
-      await pingFreeRegionKey(item.id);
-    }
+    final keys = List<FreeRegionKey>.from(_freeRegionKeys);
+    await Future.wait(keys.map((item) => pingFreeRegionKey(item.id)));
   }
 
   /// Connects directly to a published FREE region card in one tap.
@@ -434,39 +592,40 @@ class VpnController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Measures TCP handshake latency to the Shadowsocks server.
+  /// Measures TCP handshake latency to the VPN server.
   Future<int?> pingProfile(String profileId) async {
     final idx = _profiles.indexWhere((p) => p.id == profileId);
     if (idx == -1) return null;
     final prof = _profiles[idx];
 
-    final sw = Stopwatch()..start();
+    _pingingProfileIds.add(profileId);
+    notifyListeners();
+
     try {
-      final sock = await Socket.connect(
-        prof.server,
-        prof.serverPort,
-        timeout: const Duration(seconds: 3),
-      );
-      sw.stop();
-      sock.destroy();
-      final ms = sw.elapsedMilliseconds;
-      _profiles[idx] = prof.copyWith(lastPingMs: ms);
-      addLog('ping', LogLevel.info, '${prof.name} responded in ${ms}ms');
-      notifyListeners();
+      final (ms, err) = await _measureTcpLatency(prof.server, prof.serverPort);
+      final curIdx = _profiles.indexWhere((p) => p.id == profileId);
+      if (curIdx != -1) {
+        _profiles[curIdx] = _profiles[curIdx].copyWith(lastPingMs: ms ?? -1);
+      }
+      if (ms != null) {
+        addLog('ping', LogLevel.info, '${prof.name} responded in ${ms}ms');
+      } else {
+        addLog(
+          'ping',
+          LogLevel.warn,
+          'Timeout reaching ${prof.name} (${prof.server}:${prof.serverPort}): $err',
+        );
+      }
       return ms;
-    } catch (_) {
-      sw.stop();
-      _profiles[idx] = prof.copyWith(lastPingMs: -1);
-      addLog('ping', LogLevel.warn, 'Timeout reaching ${prof.name} (${prof.server}:${prof.serverPort})');
+    } finally {
+      _pingingProfileIds.remove(profileId);
       notifyListeners();
-      return null;
     }
   }
 
   Future<void> pingAllProfiles() async {
-    for (final p in List<VpnProfile>.from(_profiles)) {
-      await pingProfile(p.id);
-    }
+    final list = List<VpnProfile>.from(_profiles);
+    await Future.wait(list.map((p) => pingProfile(p.id)));
   }
 
   /// Toggles connection state:

@@ -9,6 +9,7 @@ class FreeRegionCard extends StatelessWidget {
   final bool isActive;
   final bool isConnected;
   final bool isConnecting;
+  final bool isPinging;
   final VoidCallback onConnect;
   final VoidCallback onPing;
 
@@ -18,6 +19,7 @@ class FreeRegionCard extends StatelessWidget {
     required this.isActive,
     required this.isConnected,
     required this.isConnecting,
+    this.isPinging = false,
     required this.onConnect,
     required this.onPing,
   });
@@ -152,7 +154,7 @@ class FreeRegionCard extends StatelessWidget {
                 ),
               ),
               InkWell(
-                onTap: onPing,
+                onTap: isPinging ? null : onPing,
                 borderRadius: BorderRadius.circular(8),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -161,15 +163,24 @@ class FreeRegionCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: DaylightColors.border),
                   ),
-                  child: Text(
-                    pingText,
-                    style: TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w700,
-                      fontFamily: 'monospace',
-                      color: pingColor,
-                    ),
-                  ),
+                  child: isPinging
+                      ? const SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 1.8,
+                            color: DaylightColors.primary,
+                          ),
+                        )
+                      : Text(
+                          pingText,
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            fontFamily: 'monospace',
+                            color: pingColor,
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(width: 8),

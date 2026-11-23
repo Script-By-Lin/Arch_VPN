@@ -579,9 +579,13 @@ class ConfigManager:
         if settings.get("udp_relay", True) and "mode" not in config_data:
             config_data["mode"] = "tcp_and_udp"
 
-        # Enable TCP_NODELAY for snappier TLS/DNS handshakes
+        # Enable TCP_NODELAY & TCP keep-alive to prevent idle NAT drops and speed up handshakes
         if "no_delay" not in config_data:
             config_data["no_delay"] = True
+        if "keep_alive" not in config_data:
+            config_data["keep_alive"] = 15
+        if "timeout" not in config_data:
+            config_data["timeout"] = 300
 
         with open(ACTIVE_CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(config_data, f, indent=2, ensure_ascii=False)

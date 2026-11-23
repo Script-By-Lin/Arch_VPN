@@ -9,6 +9,7 @@ import os
 import sys
 import time
 import socket
+import struct
 import signal
 import subprocess
 import shutil
@@ -62,12 +63,60 @@ class ProcessManager:
         except (OSError, ProcessLookupError):
             return False
 
-    def wait_for_port(self, host: str, port: int, timeout: float = 6.0, cancel_event: Optional[threading.Event] = None) -> bool:
-        """Polls until TCP port is accepting connections or timeout/cancel expires."""
+    @staticmethod
+    def _is_tcp_listening_proc(host: str, port: int) -> Optional[bool]:
+        """
+        Zero-touch check via /proc/net/tcp for a TCP_LISTEN (0A) socket on host:port.
+        Avoids opening & immediately closing a dummy TCP connection to sslocal,
+        which otherwise causes `ERROR socks5 tcp client handler error: unexpected end of file`.
+        Returns True/False if /proc/net/tcp is readable, or None to fall back.
+        """
+        if not os.path.exists("/proc/net/tcp"):
+            return None
+        try:
+            resolved_host = "127.0.0.1" if host in ("localhost", "") else host
+            packed = socket.inet_aton(resolved_host)
+            hex_ip = f"{struct.unpack('<I', packed)[0]:08X}"
+            hex_port = f"{int(port):04X}"
+            targets = {f"{hex_ip}:{hex_port}", f"00000000:{hex_port}"}
+            with open("/proc/net/tcp", "r", encoding="utf-8") as f:
+                next(f, None)
+                for line in f:
+                    parts = line.split()
+                    if len(parts) >= 4 and parts[3].upper() == "0A" and parts[1].upper() in targets:
+                        return True
+            return False
+        except Exception:
+            return None
+
+    def wait_for_port(
+        self,
+        host: str,
+        port: int,
+        timeout: float = 6.0,
+        cancel_event: Optional[threading.Event] = None,
+        proc: Optional[subprocess.Popen] = None,
+    ) -> bool:
+        """Polls until TCP port is listening or timeout/cancel/process exit occurs."""
         start_time = time.time()
         while time.time() - start_time < timeout:
             if cancel_event and cancel_event.is_set():
                 return False
+            if proc is not None and proc.poll() is not None:
+                return False
+
+            proc_check = self._is_tcp_listening_proc(host, port)
+            if proc_check is True:
+                return True
+            if proc_check is False:
+                if cancel_event:
+                    if cancel_event.wait(0.05):
+                        return False
+                else:
+                    time.sleep(0.05)
+                continue
+
+            # Fallback for non-Linux or unreadable /proc/net/tcp
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.settimeout(0.25)
             try:
@@ -108,8 +157,8 @@ class ProcessManager:
             log_f.close()
             raise ProcessError(f"Failed to start sslocal: {e}")
 
-        # Wait for local port to become ready
-        if not self.wait_for_port(host, port, timeout=5.0, cancel_event=cancel_event):
+        # Wait for local port to become ready (zero-touch via /proc/net/tcp)
+        if not self.wait_for_port(host, port, timeout=5.0, cancel_event=cancel_event, proc=proc):
             log_f.close()
             if cancel_event and cancel_event.is_set():
                 return proc.pid

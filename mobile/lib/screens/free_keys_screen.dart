@@ -214,6 +214,7 @@ class _FreeKeysScreenState extends State<FreeKeysScreen> {
                                 isActive: isActive,
                                 isConnected: isConn,
                                 isConnecting: isBusy,
+                                isPinging: ctrl.isFreeKeyPinging(item.id),
                                 onPing: () => ctrl.pingFreeRegionKey(item.id),
                                 onConnect: () async {
                                   if (isConn) {
